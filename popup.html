@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meow AI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Main App Screen -->
+    <div id="mainScreen" class="main-screen">
+      <!-- Header -->
+      <header>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1>🐱 Meow AI</h1>
+            <p class="subtitle">Your AI Developer Copilot</p>
+          </div>
+          <button id="settingsBtn" class="settings-btn" title="About">ℹ️</button>
+        </div>
+        <div id="modeDisplay" class="mode-display"></div>
+      </header>
+
+      <!-- Main Action -->
+      <div class="action-section">
+        <button id="explainBtn" class="primary-btn">
+          Explain This Page
+        </button>
+      </div>
+
+      <!-- Results Display -->
+      <div id="results" class="results-section"></div>
+    </div>
+
+    <!-- About Screen -->
+    <div id="settingsScreen" class="settings-screen" style="display: none;">
+      <header>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2>ℹ️ About Meow AI</h2>
+          <button id="closeSettingsBtn" class="close-btn">×</button>
+        </div>
+      </header>
+      
+      <div class="settings-content">
+        <div class="settings-section">
+          <h3>🐱 Meow AI</h3>
+          <p><strong>Version:</strong> 1.0.0</p>
+          <p><strong>Description:</strong> AI-powered developer and career copilot</p>
+          <p><strong>Backend:</strong> Secure Cloudflare Workers proxy</p>
+          <p><strong>AI Model:</strong> Mistral-7B-Instruct</p>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Features</h3>
+          <ul style="margin: 0; padding-left: 20px;">
+            <li>Smart page analysis</li>
+            <li>PR code reviews</li>
+            <li>LeetCode problem assistance</li>
+            <li>Career advice</li>
+            <li>Side chat panel on any webpage</li>
+          </ul>
+        </div>
+
+        <div class="settings-section">
+          <h3>Privacy & Security</h3>
+          <p>✅ Zero setup required</p>
+          <p>✅ API keys secured server-side</p>
+          <p>✅ Your data never stored</p>
+          <p>✅ End-to-end encrypted requests</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "meow-ai-backend",
+  "version": "1.0.0",
+  "description": "Secure backend proxy for Meow AI Chrome Extension",
+  "main": "worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:dev": "wrangler deploy --env development",
+    "tail": "wrangler tail",
+    "secret:set": "wrangler secret put HUGGINGFACE_API_KEY"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "serverless",
+    "proxy",
+    "chrome-extension"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

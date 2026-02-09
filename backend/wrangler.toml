@@ -1,0 +1,31 @@
+# Cloudflare Workers Configuration
+# Meow AI Backend Proxy
+
+name = "meow-ai-backend"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Workers Free Tier:
+# - 100,000 requests/day
+# - 10ms CPU time per request
+# - Sufficient for personal/small projects
+
+# Environment Variables (non-sensitive)
+[vars]
+ENVIRONMENT = "production"
+
+# Secrets (sensitive - set via CLI)
+# DO NOT add HUGGINGFACE_API_KEY here!
+# Set via: wrangler secret put HUGGINGFACE_API_KEY
+
+# Custom domains (optional - after deployment)
+# routes = [
+#   { pattern = "api.meowai.com/*", zone_name = "meowai.com" }
+# ]
+
+# Development settings
+[env.development]
+name = "meow-ai-backend-dev"
+
+[env.development.vars]
+ENVIRONMENT = "development"
