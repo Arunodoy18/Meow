@@ -150,11 +150,11 @@ const MeowStreamManager = (() => {
 
   /**
    * Start streaming a response from the backend.
-   * @param {string} message - User message to send
+   * @param {Object|string} payload - Either conversation payload object or legacy message string
    * @param {string} mode - Page analysis mode
    * @returns {string} Message ID for tracking
    */
-  async function startStream(message, mode) {
+  async function startStream(payload, mode) {
     // Prevent double-request
     if (_state === STATE.STREAMING || _state === STATE.CONNECTING) {
       _log('BLOCKED', 'Stream already active, ignoring');
@@ -171,11 +171,23 @@ const MeowStreamManager = (() => {
 
     _abortController = new AbortController();
 
+    // Build request body — support both payload object and legacy string
+    let requestBody;
+    if (typeof payload === 'string') {
+      requestBody = { message: payload, mode };
+    } else {
+      requestBody = {
+        systemPrompt: payload.systemPrompt || '',
+        messages: payload.messages || [],
+        mode: payload.mode || mode
+      };
+    }
+
     try {
       const response = await fetch(STREAM_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, mode }),
+        body: JSON.stringify(requestBody),
         signal: _abortController.signal
       });
 
@@ -437,14 +449,27 @@ const MeowStreamManager = (() => {
     _abortController = new AbortController();
     _startConnectTimeout(msgId);
 
+    // Use conversation memory for continuation context if available
+    let requestBody;
+    if (typeof MeowConversationMemory !== 'undefined' && MeowConversationMemory.buildContinuationPayload) {
+      const contPayload = MeowConversationMemory.buildContinuationPayload();
+      requestBody = {
+        systemPrompt: contPayload.systemPrompt,
+        messages: contPayload.messages,
+        mode: contPayload.mode
+      };
+    } else {
+      requestBody = {
+        message: 'Continue naturally from where you stopped. Do not repeat what you already said.',
+        mode: 'General Analysis'
+      };
+    }
+
     try {
       const response = await fetch(STREAM_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: 'Continue from where you stopped. Do not repeat what you already said.',
-          mode: 'general_analysis'
-        }),
+        body: JSON.stringify(requestBody),
         signal: _abortController.signal
       });
 

@@ -33,8 +33,8 @@ const CONFIG = {
   ALLOWED_ORIGINS: ['*'],
   
   // Rate limiting (optional - implement if needed)
-  MAX_MESSAGE_LENGTH: 5000,
-  MAX_PROMPT_LENGTH: 10000,
+  MAX_MESSAGE_LENGTH: 8000,
+  MAX_PROMPT_LENGTH: 15000,
 };
 
 // ==================== CORS HEADERS ====================
@@ -75,18 +75,34 @@ function validateRequest(body) {
     return { valid: false, error: 'Request body is required' };
   }
   
-  // Check if message exists
-  if (!body.message || typeof body.message !== 'string') {
-    return { valid: false, error: 'Message field is required and must be a string' };
+  // Support both: single message string OR messages array
+  const hasMessage = body.message && typeof body.message === 'string';
+  const hasMessages = Array.isArray(body.messages) && body.messages.length > 0;
+  
+  if (!hasMessage && !hasMessages) {
+    return { valid: false, error: 'Either message (string) or messages (array) is required' };
   }
   
-  // Check message length
-  if (body.message.trim().length === 0) {
-    return { valid: false, error: 'Message cannot be empty' };
+  // Validate single message
+  if (hasMessage) {
+    if (body.message.trim().length === 0) {
+      return { valid: false, error: 'Message cannot be empty' };
+    }
+    if (body.message.length > CONFIG.MAX_MESSAGE_LENGTH) {
+      return { valid: false, error: `Message exceeds maximum length of ${CONFIG.MAX_MESSAGE_LENGTH} characters` };
+    }
   }
   
-  if (body.message.length > CONFIG.MAX_MESSAGE_LENGTH) {
-    return { valid: false, error: `Message exceeds maximum length of ${CONFIG.MAX_MESSAGE_LENGTH} characters` };
+  // Validate messages array
+  if (hasMessages) {
+    for (const msg of body.messages) {
+      if (!msg.role || !msg.content) {
+        return { valid: false, error: 'Each message must have role and content' };
+      }
+      if (!['user', 'assistant', 'model'].includes(msg.role)) {
+        return { valid: false, error: 'Message role must be user, assistant, or model' };
+      }
+    }
   }
   
   // Mode is optional, but if provided must be string
@@ -249,20 +265,15 @@ async function handleStreamRequest(body, apiKey) {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s for streaming
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+    // Build Gemini request body — supports multi-turn conversations
+    const geminiBody = _buildGeminiBody(body);
 
     const geminiResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: body.message }] }],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048,
-        },
-      }),
+      body: JSON.stringify(geminiBody),
       signal: controller.signal,
     });
 
@@ -364,6 +375,55 @@ async function handleStreamRequest(body, apiKey) {
       { status: 500, headers: { 'Content-Type': 'application/json', ...getCorsHeaders() } }
     );
   }
+}
+
+// ==================== GEMINI BODY BUILDER ====================
+
+/**
+ * Build Gemini API request body from client payload.
+ * Supports:
+ * - Single message (legacy): { message: "..." }
+ * - Multi-turn conversation: { messages: [{role, content}], systemPrompt: "..." }
+ *
+ * Gemini format:
+ * {
+ *   contents: [{role: "user"|"model", parts: [{text}]}],
+ *   systemInstruction: {parts: [{text}]},
+ *   generationConfig: {...}
+ * }
+ */
+function _buildGeminiBody(body) {
+  const geminiBody = {
+    generationConfig: {
+      temperature: 0.75,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 4096,
+    },
+  };
+
+  // System instruction (personality prompt)
+  if (body.systemPrompt) {
+    geminiBody.systemInstruction = {
+      parts: [{ text: body.systemPrompt }]
+    };
+  }
+
+  // Multi-turn conversation
+  if (Array.isArray(body.messages) && body.messages.length > 0) {
+    geminiBody.contents = body.messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : msg.role,
+      parts: [{ text: msg.content }]
+    }));
+  } else if (body.message) {
+    // Legacy single-message format
+    geminiBody.contents = [{
+      role: 'user',
+      parts: [{ text: body.message }]
+    }];
+  }
+
+  return geminiBody;
 }
 
 // ==================== ERROR RESPONSE BUILDER ====================

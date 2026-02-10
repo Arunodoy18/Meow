@@ -549,6 +549,38 @@ const MeowChatUI = (() => {
         background: rgba(124, 58, 237, 0.15);
         border-color: var(--meow-primary-light);
       }
+
+      /* ==================== THINKING INDICATOR ==================== */
+      .meow-thinking {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        align-self: flex-start;
+        font-size: 12px;
+        color: #7c3aed;
+        font-family: var(--meow-font);
+        animation: meowMsgSlide 0.25s ease;
+      }
+
+      .meow-thinking-text {
+        opacity: 0.8;
+        font-weight: 500;
+      }
+
+      .meow-thinking-pulse {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--meow-primary);
+        animation: meowThinkPulse 1.2s ease-in-out infinite;
+      }
+
+      @keyframes meowThinkPulse {
+        0%, 100% { opacity: 0.3; transform: scale(0.8); }
+        50% { opacity: 1; transform: scale(1.2); }
+      }
     `;
 
     document.head.appendChild(style);
@@ -792,6 +824,34 @@ const MeowChatUI = (() => {
     if (el) el.remove();
   }
 
+  /**
+   * Show a "thinking" indicator (more human than dots).
+   */
+  function showThinking() {
+    hideThinking();
+    const container = _panel?.querySelector('.meow-chat-messages');
+    if (!container) return;
+
+    const el = document.createElement('div');
+    el.className = 'meow-message ai meow-thinking-indicator';
+    el.innerHTML = `
+      <div class="meow-thinking">
+        <span class="meow-thinking-pulse"></span>
+        <span class="meow-thinking-text">Thinking...</span>
+      </div>
+    `;
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  /**
+   * Remove thinking indicator.
+   */
+  function hideThinking() {
+    const el = _panel?.querySelector('.meow-thinking-indicator');
+    if (el) el.remove();
+  }
+
   // ==================== STREAMING MESSAGE METHODS ====================
 
   /**
@@ -975,6 +1035,8 @@ const MeowChatUI = (() => {
     appendStreamChunk,
     finalizeStreamMessage,
     showRetryButton,
+    showThinking,
+    hideThinking,
     openPanel,
     closePanel,
     togglePanel,
