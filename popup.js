@@ -387,20 +387,35 @@ function showSettingsScreen() {
  */
 async function getPageContent(tabId) {
   return new Promise((resolve, reject) => {
-    // Send message to content script to extract page text
-    chrome.tabs.sendMessage(
-      tabId,
-      { action: 'getPageContent' },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error('Could not communicate with page. Try refreshing.'));
-        } else if (response && response.success) {
-          resolve(response.data);
-        } else {
-          reject(new Error('Failed to extract page content'));
+    // CRASH-SAFE messaging for demo
+    try {
+      chrome.tabs.sendMessage(
+        tabId,
+        { action: 'getPageContent' },
+        (response) => {
+          // Handle Chrome runtime errors (content script not loaded)
+          if (chrome.runtime.lastError) {
+            console.error('Message error:', chrome.runtime.lastError.message);
+            reject(new Error('⚠️ Page not ready. Please refresh the page and try again.'));
+            return;
+          }
+          
+          // Handle response errors
+          if (!response) {
+            reject(new Error('⚠️ No response from page. Please refresh.'));
+            return;
+          }
+          
+          if (response.success) {
+            resolve(response.data);
+          } else {
+            reject(new Error(response.error || 'Failed to extract page content'));
+          }
         }
-      }
-    );
+      );
+    } catch (error) {
+      reject(new Error('⚠️ Communication error: ' + error.message));
+    }
   });
 }
 
@@ -420,7 +435,8 @@ async function callHuggingFaceAPI(text, title, mode) {
   // SECURITY: Backend proxy handles all API authentication
   // No API key needed in extension code
   
-  // Get mode-specific configuration  const modeConfig = MODES[mode];
+  // Get mode-specific configuration
+  const modeConfig = MODES[mode];
   
   // Create message for backend
   const message = `Page Title: ${title}\n\nPage Content:\n${text}\n\nProvide a concise, insightful analysis based on this ${mode.replace('_mode', '')} context.`;

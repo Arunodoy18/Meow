@@ -3,26 +3,30 @@
  * 
  * SECURITY ARCHITECTURE:
  * - API key stored as Cloudflare secret (never in code)
- * - Extension calls this proxy instead of Hugging Face directly
+ * - Extension calls this proxy instead of Gemini directly
  * - Proxy attaches API key server-side and forwards request
  * - Users never see or have access to the API key
  * 
  * DEPLOYMENT:
  * 1. Install Wrangler CLI: npm install -g wrangler
  * 2. Login: wrangler login
- * 3. Set secret: wrangler secret put HUGGINGFACE_API_KEY
+ * 3. Set secret: wrangler secret put GEMINI_API_KEY
  * 4. Deploy: wrangler deploy
  */
 
 // ==================== CONFIGURATION ====================
 
 const CONFIG = {
-  // Hugging Face model endpoint
-  MODEL_NAME: 'mistralai/Mistral-7B-Instruct-v0.2',
-  HF_API_URL: 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
+  // Google Gemini API configuration
+  MODEL_NAME: 'gemini-2.5-flash',
+  GEMINI_API_BASE: 'https://generativelanguage.googleapis.com/v1beta/models',
   
   // Request timeout (milliseconds)
   TIMEOUT_MS: 30000,
+  
+  // Retry configuration
+  MAX_RETRIES: 3,
+  RETRY_DELAY_MS: 1000,
   
   // CORS allowed origins (Chrome extension protocol)
   // "*" allows all origins - restrict in production if needed
@@ -93,10 +97,46 @@ function validateRequest(body) {
   return { valid: true };
 }
 
-// ==================== HUGGING FACE API ====================
+// ==================== GEMINI API ====================
 
 /**
- * Call Hugging Face Inference API with user message
+ * Retry wrapper with exponential backoff
+ * @param {Function} fn - Async function to retry
+ * @param {number} maxRetries - Maximum retry attempts
+ * @returns {Promise<any>} Function result
+ */
+async function withRetry(fn, maxRetries = CONFIG.MAX_RETRIES) {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry on auth errors or validation errors
+      if (error.message.includes('SERVICE_UNAVAILABLE') || 
+          error.message.includes('VALIDATION')) {
+        throw error;
+      }
+      
+      // Last attempt - throw error
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait before retry with exponential backoff
+      const delay = CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+      console.log(`Retry attempt ${attempt}/${maxRetries} after ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
+ * Call Google Gemini API with user message
  * 
  * SECURITY NOTE:
  * - API key retrieved from environment variable (Cloudflare secret)
@@ -104,33 +144,35 @@ function validateRequest(body) {
  * - Timeout prevents hanging requests
  * 
  * @param {string} message - User's message
- * @param {string} apiKey - Hugging Face API key from environment
+ * @param {string} apiKey - Gemini API key from environment
  * @param {string} mode - Optional context mode
  * @returns {Promise<string>} AI-generated response
  */
-async function callHuggingFaceAPI(message, apiKey, mode = 'general') {
-  // Build prompt based on mode (simplified - extend as needed)
-  const prompt = `[INST] ${message} [/INST]`;
+async function callGeminiAPI(message, apiKey, mode = 'general') {
+  // Build API URL with key as query parameter (Gemini requirement)
+  const apiUrl = `${CONFIG.GEMINI_API_BASE}/${CONFIG.MODEL_NAME}:generateContent?key=${apiKey}`;
   
   // SECURITY: Use AbortController for timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
   
   try {
-    const response = await fetch(CONFIG.HF_API_URL, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        // SECURITY: API key from environment, never hardcoded
-        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        inputs: prompt,
-        parameters: {
-          max_new_tokens: 300,
+        contents: [{
+          parts: [{
+            text: message
+          }]
+        }],
+        generationConfig: {
           temperature: 0.7,
-          top_p: 0.95,
-          return_full_text: false,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
         },
       }),
       signal: controller.signal,
@@ -140,29 +182,29 @@ async function callHuggingFaceAPI(message, apiKey, mode = 'general') {
     
     // Handle HTTP errors
     if (!response.ok) {
-      if (response.status === 503) {
-        throw new Error('AI_MODEL_LOADING');
-      } else if (response.status === 401) {
-        // SECURITY: Don't expose that API key is invalid to client
-        console.error('Invalid Hugging Face API key configured');
-        throw new Error('SERVICE_UNAVAILABLE');
-      } else if (response.status === 429) {
+      const errorText = await response.text();
+      console.error('Gemini API Error:', response.status, errorText);
+      
+      if (response.status === 429) {
         throw new Error('RATE_LIMIT_EXCEEDED');
+      } else if (response.status === 401 || response.status === 403) {
+        console.error('Invalid Gemini API key configured');
+        throw new Error('SERVICE_UNAVAILABLE');
       } else {
-        throw new Error(`HF_API_ERROR_${response.status}`);
+        throw new Error(`GEMINI_API_ERROR_${response.status}`);
       }
     }
     
     const data = await response.json();
     
-    // Extract generated text
-    if (data && data[0] && data[0].generated_text) {
-      return data[0].generated_text;
-    } else if (typeof data === 'string') {
-      return data;
-    } else if (data.error) {
-      throw new Error(`HF_ERROR: ${data.error}`);
+    // Extract generated text from Gemini response format
+    if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      return data.candidates[0].content.parts[0].text;
+    } else if (data?.error) {
+      console.error('Gemini API returned error:', data.error);
+      throw new Error('GEMINI_ERROR');
     } else {
+      console.error('Unexpected Gemini response format:', JSON.stringify(data));
       throw new Error('UNEXPECTED_RESPONSE_FORMAT');
     }
     
@@ -175,10 +217,9 @@ async function callHuggingFaceAPI(message, apiKey, mode = 'general') {
     }
     
     // Re-throw known errors
-    if (error.message.startsWith('AI_MODEL_') || 
+    if (error.message.startsWith('RATE_LIMIT_') ||
         error.message.startsWith('SERVICE_') ||
-        error.message.startsWith('RATE_LIMIT_') ||
-        error.message.startsWith('HF_')) {
+        error.message.startsWith('GEMINI_')) {
       throw error;
     }
     
@@ -188,7 +229,7 @@ async function callHuggingFaceAPI(message, apiKey, mode = 'general') {
     }
     
     // Unknown errors - log but don't expose details
-    console.error('Unexpected error calling Hugging Face:', error);
+    console.error('Unexpected error calling Gemini:', error);
     throw new Error('INTERNAL_ERROR');
   }
 }
@@ -205,20 +246,15 @@ async function callHuggingFaceAPI(message, apiKey, mode = 'general') {
  */
 function buildErrorResponse(errorCode, statusCode = 500) {
   const errorMessages = {
-    'AI_MODEL_LOADING': {
-      message: 'AI model is loading. Please try again in 20-30 seconds.',
-      code: 'MODEL_LOADING',
-      status: 503,
+    'RATE_LIMIT_EXCEEDED': {
+      message: 'Rate limit exceeded. Please try again in a few moments.',
+      code: 'RATE_LIMIT',
+      status: 429,
     },
     'SERVICE_UNAVAILABLE': {
       message: 'AI service is temporarily unavailable. Please try again later.',
       code: 'SERVICE_ERROR',
       status: 503,
-    },
-    'RATE_LIMIT_EXCEEDED': {
-      message: 'Rate limit exceeded. Please try again in a few moments.',
-      code: 'RATE_LIMIT',
-      status: 429,
     },
     'REQUEST_TIMEOUT': {
       message: 'Request timed out. Please try again.',
@@ -306,8 +342,8 @@ export default {
     // ==================== ENVIRONMENT CHECK ====================
     
     // SECURITY: Validate API key exists in environment
-    if (!env.HUGGINGFACE_API_KEY) {
-      console.error('CRITICAL: HUGGINGFACE_API_KEY environment variable not set');
+    if (!env.GEMINI_API_KEY) {
+      console.error('CRITICAL: GEMINI_API_KEY environment variable not set');
       return buildErrorResponse('SERVICE_UNAVAILABLE');
     }
     
@@ -357,10 +393,13 @@ export default {
     
     try {
       // SECURITY: API key from environment, never exposed to client
-      const aiResponse = await callHuggingFaceAPI(
-        body.message,
-        env.HUGGINGFACE_API_KEY,
-        body.mode
+      // RELIABILITY: Wrapped with retry logic
+      const aiResponse = await withRetry(() => 
+        callGeminiAPI(
+          body.message,
+          env.GEMINI_API_KEY,
+          body.mode
+        )
       );
       
       // Return success response

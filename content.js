@@ -14,18 +14,92 @@
 // API key is stored as encrypted environment secret on server (never exposed to users)
 const BACKEND_API_URL = 'https://meow-ai-backend.meow-ai-arunodoy.workers.dev/api/chat';
 
+// ==================== SITE CONTROL SYSTEM ====================
+const SITE_CONTROL_KEY = 'meow_ai_site_control';
+
+/**
+ * Site control storage structure:
+ * {
+ *   "example.com": {
+ *     disabled: true,
+ *     disabledUntil: timestamp | null,
+ *     permanently: boolean
+ *   }
+ * }
+ */
+function getSiteDomain() {
+  return window.location.hostname;
+}
+
+function getSiteControl() {
+  try {
+    const data = localStorage.getItem(SITE_CONTROL_KEY);
+    return data ? JSON.parse(data) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function setSiteControl(domain, settings) {
+  try {
+    const control = getSiteControl();
+    control[domain] = settings;
+    localStorage.setItem(SITE_CONTROL_KEY, JSON.stringify(control));
+  } catch (e) {
+    console.error('Failed to save site control:', e);
+  }
+}
+
+function isSiteDisabled() {
+  const domain = getSiteDomain();
+  const control = getSiteControl();
+  const site = control[domain];
+  
+  if (!site || !site.disabled) return false;
+  
+  // Check if temporary disable expired
+  if (!site.permanently && site.disabledUntil) {
+    if (Date.now() > site.disabledUntil) {
+      // Re-enable site
+      delete control[domain];
+      localStorage.setItem(SITE_CONTROL_KEY, JSON.stringify(control));
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+function disableSite(temporarily = false) {
+  const domain = getSiteDomain();
+  const settings = {
+    disabled: true,
+    disabledUntil: temporarily ? Date.now() + (24 * 60 * 60 * 1000) : null,
+    permanently: !temporarily
+  };
+  setSiteControl(domain, settings);
+}
+
+function enableSite() {
+  const domain = getSiteDomain();
+  const control = getSiteControl();
+  delete control[domain];
+  localStorage.setItem(SITE_CONTROL_KEY, JSON.stringify(control));
+}
+
 // ==================== CHAT STATE ====================
 let chatMessages = [];      // For UI display: [{type: 'user'|'ai', content: string, timestamp: Date}]
 let chatHistory = [];        // For API memory: [{role: 'user'|'assistant', content: string}]
 let chatPanel = null;
 let toggleButton = null;
+let settingsMenu = null;
 let isPanelOpen = false;
+let isDragging = false;
+let dragOffset = { x: 0, y: 0 };
 
 // Memory configuration
 const MAX_HISTORY_SIZE = 20;     // Maximum messages to keep in memory
 const CONTEXT_WINDOW_SIZE = 6;   // Number of recent messages to send to API
-
-console.log('🐱 Meow AI content script loaded');
 
 /**
  * Extract visible page content for AI context
@@ -512,6 +586,37 @@ function injectChatStyles() {
     .meow-chat-messages::-webkit-scrollbar-thumb:hover {
       background: #999;
     }
+    
+    /* Settings Menu */
+    .meow-settings-menu {
+      position: fixed;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      z-index: 1000000;
+      min-width: 200px;
+      padding: 8px 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+    
+    .meow-settings-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #333;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .meow-settings-item:hover {
+      background: #f5f5f5;
+    }
+    
+    .meow-settings-item:active {
+      background: #e0e0e0;
+    }
   `;
   
   document.head.appendChild(style);
@@ -582,7 +687,23 @@ function renderMessages() {
   }
   
   // Render messages
-  chatMessages.forEach(msg  in the chat
+  chatMessages.forEach(msg => {
+    const messageEl = document.createElement('div');
+    messageEl.className = `meow-message ${msg.type}`;
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'meow-message-bubble';
+    bubble.textContent = msg.content;
+    
+    messageEl.appendChild(bubble);
+    messagesContainer.appendChild(messageEl);
+  });
+  
+  // Auto-scroll to bottom
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+/**
  * Main chat flow: user message → thinking indicator → API call → AI response
  */
 async function handleSendMessage() {
@@ -626,6 +747,26 @@ async function handleSendMessage() {
     addMessage('ai', 'Meow AI is having trouble responding. Try again.');
   } finally {
     // ==================== STEP 6: RE-ENABLE INPUT ====================
+    textarea.disabled = false;
+    sendBtn.disabled = false;
+    textarea.focus();
+  }
+}
+
+/**
+ * Show thinking indicator while waiting for AI response
+ */
+function showThinking() {
+  const messagesContainer = chatPanel.querySelector('.meow-chat-messages');
+  
+  const thinkingEl = document.createElement('div');
+  thinkingEl.className = 'meow-message meow-thinking-message';
+  thinkingEl.innerHTML = `
+    <div class="meow-message-bubble">
+      <span class="meow-thinking-dots">
+        <span>.</span><span>.</span><span>.</span>
+      </span>
+      Thinking...
     </div>
   `;
   
@@ -711,11 +852,17 @@ async function handleSendMessage() {
  * Create chat panel UI
  */
 function createChatPanel() {
-  // Create toggle button
+  // Create toggle button (draggable)
   toggleButton = document.createElement('button');
   toggleButton.className = 'meow-chat-toggle';
   toggleButton.innerHTML = '🐱';
-  toggleButton.title = 'Meow AI Assistant';
+  toggleButton.title = 'Meow AI Assistant (drag to move)';
+  
+  // Make button draggable
+  makeButtonDraggable();
+  
+  // Create settings menu
+  createSettingsMenu();
   
   // Create chat panel
   chatPanel = document.createElement('div');
@@ -762,10 +909,155 @@ function createChatPanel() {
   
   // Append to body
   document.body.appendChild(toggleButton);
+  document.body.appendChild(settingsMenu);
   document.body.appendChild(chatPanel);
   
   // Add event listeners
   setupEventListeners();
+  
+  // Load saved button position
+  loadButtonPosition();
+}
+
+/**
+ * Create settings menu (gear icon on toggle button)
+ */
+function createSettingsMenu() {
+  settingsMenu = document.createElement('div');
+  settingsMenu.className = 'meow-settings-menu';
+  settingsMenu.style.display = 'none';
+  
+  settingsMenu.innerHTML = `
+    <div class="meow-settings-item" data-action="disable-site">
+      🚫 Disable for this site
+    </div>
+    <div class="meow-settings-item" data-action="disable-24h">
+      ⏰ Disable for 24 hours
+    </div>
+  `;
+}
+
+/**
+ * Make toggle button draggable
+ */
+function makeButtonDraggable() {
+  toggleButton.addEventListener('mousedown', startDrag);
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', stopDrag);
+}
+
+function startDrag(e) {
+  // Right-click for settings menu
+  if (e.button === 2) {
+    e.preventDefault();
+    showSettingsMenu(e);
+    return;
+  }
+  
+  // Only drag with left click
+  if (e.button !== 0) return;
+  
+  const rect = toggleButton.getBoundingClientRect();
+  dragOffset.x = e.clientX - rect.left;
+  dragOffset.y = e.clientY - rect.top;
+  
+  // Small movement threshold to distinguish click from drag
+  const startX = e.clientX;
+  const startY = e.clientY;
+  
+  const checkDrag = (moveEvent) => {
+    const distance = Math.sqrt(
+      Math.pow(moveEvent.clientX - startX, 2) + 
+      Math.pow(moveEvent.clientY - startY, 2)
+    );
+    if (distance > 5) {
+      isDragging = true;
+      toggleButton.style.cursor = 'grabbing';
+      document.removeEventListener('mousemove', checkDrag);
+    }
+  };
+  
+  document.addEventListener('mousemove', checkDrag);
+  setTimeout(() => document.removeEventListener('mousemove', checkDrag), 200);
+}
+
+function drag(e) {
+  if (!isDragging) return;
+  
+  e.preventDefault();
+  
+  let x = e.clientX - dragOffset.x;
+  let y = e.clientY - dragOffset.y;
+  
+  // Keep within viewport bounds
+  const maxX = window.innerWidth - toggleButton.offsetWidth;
+  const maxY = window.innerHeight - toggleButton.offsetHeight;
+  
+  x = Math.max(0, Math.min(x, maxX));
+  y = Math.max(0, Math.min(y, maxY));
+  
+  toggleButton.style.right = 'auto';
+  toggleButton.style.bottom = 'auto';
+  toggleButton.style.left = x + 'px';
+  toggleButton.style.top = y + 'px';
+}
+
+function stopDrag() {
+  if (isDragging) {
+    isDragging = false;
+    toggleButton.style.cursor = 'pointer';
+    saveButtonPosition();
+  }
+}
+
+function saveButtonPosition() {
+  try {
+    const pos = {
+      left: toggleButton.style.left,
+      top: toggleButton.style.top
+    };
+    localStorage.setItem('meow_button_position', JSON.stringify(pos));
+  } catch (e) {
+    console.error('Failed to save button position:', e);
+  }
+}
+
+function loadButtonPosition() {
+  try {
+    const saved = localStorage.getItem('meow_button_position');
+    if (saved) {
+      const pos = JSON.parse(saved);
+      if (pos.left && pos.top) {
+        toggleButton.style.right = 'auto';
+        toggleButton.style.bottom = 'auto';
+        toggleButton.style.left = pos.left;
+        toggleButton.style.top = pos.top;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load button position:', e);
+  }
+}
+
+function showSettingsMenu(e) {
+  e.preventDefault();
+  
+  // Position menu near button
+  const rect = toggleButton.getBoundingClientRect();
+  settingsMenu.style.left = (rect.left - 180) + 'px';
+  settingsMenu.style.top = rect.top + 'px';
+  settingsMenu.style.display = 'block';
+  
+  // Close on click outside
+  setTimeout(() => {
+    const closeMenu = (event) => {
+      if (!settingsMenu.contains(event.target) && event.target !== toggleButton) {
+        settingsMenu.style.display = 'none';
+        document.removeEventListener('click', closeMenu);
+      }
+    };
+    document.addEventListener('click', closeMenu);
+  }, 10);
 }
 
 /**
@@ -777,8 +1069,21 @@ function setupEventListeners() {
   const textarea = chatPanel.querySelector('.meow-chat-textarea');
   const quickBtns = chatPanel.querySelectorAll('.meow-quick-btn');
   
-  // Toggle button
-  toggleButton.addEventListener('click', togglePanel);
+  // Toggle button - only toggle panel if not dragging
+  toggleButton.addEventListener('click', (e) => {
+    if (!isDragging) {
+      togglePanel();
+    }
+  });
+  
+  // Right-click menu
+  toggleButton.addEventListener('contextmenu', showSettingsMenu);
+  
+  // Settings menu handlers
+  const settingsItems = settingsMenu.querySelectorAll('.meow-settings-item');
+  settingsItems.forEach(item => {
+    item.addEventListener('click', handleSettingsAction);
+  });
   
   // Close button
   closeBtn.addEventListener('click', closePanel);
@@ -851,10 +1156,35 @@ function closePanel() {
   isPanelOpen = false;
 }
 
+function handleSettingsAction(e) {
+  const action = e.currentTarget.dataset.action;
+  
+  settingsMenu.style.display = 'none';
+  
+  if (action === 'disable-site') {
+    disableSite(false);
+    if (toggleButton) toggleButton.remove();
+    if (chatPanel) chatPanel.remove();
+    if (settingsMenu) settingsMenu.remove();
+    alert('🐱 Meow AI disabled for this site.\nRefresh to enable again.');
+  } else if (action === 'disable-24h') {
+    disableSite(true);
+    if (toggleButton) toggleButton.remove();
+    if (chatPanel) chatPanel.remove();
+    if (settingsMenu) settingsMenu.remove();
+    alert('🐱 Meow AI disabled for 24 hours.\nWill re-enable automatically.');
+  }
+}
+
 /**
  * Initialize chat UI
  */
 function initChatUI() {
+  // Check if site is disabled
+  if (isSiteDisabled()) {
+    return;
+  }
+  
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       injectChatStyles();
@@ -866,18 +1196,27 @@ function initChatUI() {
   }
 }
 
-// Initialize
-initChatUI();
+// Initialize with crash protection
+try {
+  initChatUI();
+} catch (error) {
+  console.error('Meow AI initialization failed:', error);
+}
 
 /**
- * Listen for messages from popup (if needed for compatibility)
+ * Listen for messages from popup (CRASH-SAFE for demo)
  */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'getPageContent') {
-    const content = extractPageContent();
-    sendResponse({ success: true, data: content });
+  try {
+    if (request.action === 'getPageContent') {
+      const content = extractPageContent();
+      sendResponse({ success: true, data: content });
+    } else {
+      sendResponse({ success: false, error: 'Unknown action' });
+    }
+  } catch (error) {
+    console.error('🐱 Message handler error:', error);
+    sendResponse({ success: false, error: error.message });
   }
-  return true;
+  return true; // Keep channel open for async response
 });
-
-console.log('🐱 Meow AI chat panel ready');
