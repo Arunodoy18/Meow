@@ -10,64 +10,71 @@
   <div class="container">
     <!-- Main App Screen -->
     <div id="mainScreen" class="main-screen">
-      <!-- Header -->
       <header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <h1>🐱 Meow AI</h1>
-            <p class="subtitle">Your AI Developer Copilot</p>
+        <div class="header-row">
+          <div class="header-brand">
+            <div class="header-avatar">🐱</div>
+            <div>
+              <h1>Meow AI</h1>
+              <p class="subtitle">AI Developer Copilot</p>
+            </div>
           </div>
-          <button id="settingsBtn" class="settings-btn" title="About">ℹ️</button>
+          <button id="settingsBtn" class="icon-btn" title="About" aria-label="About">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </button>
         </div>
-        <div id="modeDisplay" class="mode-display"></div>
+        <div id="modeDisplay" class="mode-badge"></div>
       </header>
 
-      <!-- Main Action -->
       <div class="action-section">
         <button id="explainBtn" class="primary-btn">
+          <span class="btn-icon">📄</span>
           Explain This Page
         </button>
       </div>
 
-      <!-- Results Display -->
       <div id="results" class="results-section"></div>
     </div>
 
     <!-- About Screen -->
     <div id="settingsScreen" class="settings-screen" style="display: none;">
       <header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <h2>ℹ️ About Meow AI</h2>
-          <button id="closeSettingsBtn" class="close-btn">×</button>
+        <div class="header-row">
+          <h2>About Meow AI</h2>
+          <button id="closeSettingsBtn" class="icon-btn" aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+          </button>
         </div>
       </header>
       
       <div class="settings-content">
-        <div class="settings-section">
+        <div class="settings-card">
           <h3>🐱 Meow AI</h3>
-          <p><strong>Version:</strong> 1.0.0</p>
-          <p><strong>Description:</strong> AI-powered developer and career copilot</p>
-          <p><strong>Backend:</strong> Secure Cloudflare Workers proxy</p>
-          <p><strong>AI Model:</strong> Mistral-7B-Instruct</p>
+          <p><strong>Version:</strong> 2.0.0</p>
+          <p><strong>Backend:</strong> Cloudflare Workers</p>
+          <p><strong>AI Model:</strong> Gemini 2.5 Flash</p>
         </div>
         
-        <div class="settings-section">
+        <div class="settings-card">
           <h3>Features</h3>
-          <ul style="margin: 0; padding-left: 20px;">
-            <li>Smart page analysis</li>
+          <ul>
+            <li>Smart page analysis with auto mode detection</li>
             <li>PR code reviews</li>
-            <li>LeetCode problem assistance</li>
-            <li>Career advice</li>
-            <li>Side chat panel on any webpage</li>
+            <li>LeetCode tutoring</li>
+            <li>Career strategy</li>
+            <li>Side chat panel on any page</li>
+            <li>Keyboard shortcut: <kbd>Alt+M</kbd></li>
           </ul>
         </div>
 
-        <div class="settings-section">
+        <div class="settings-card">
           <h3>Privacy & Security</h3>
-          <p>✅ Zero setup required</p>
-          <p>✅ API keys secured server-side</p>
-          <p>✅ Your data never stored</p>
-          <p>✅ End-to-end encrypted requests</p>
+          <div class="privacy-items">
+            <div class="privacy-item">✅ Zero setup required</div>
+            <div class="privacy-item">✅ API keys secured server-side</div>
+            <div class="privacy-item">✅ Your data never stored</div>
+            <div class="privacy-item">✅ Open source</div>
+          </div>
         </div>
       </div>
     </div>
