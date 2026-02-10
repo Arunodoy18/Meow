@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Meow AI",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "🐱 AI-powered developer copilot with zero setup. Explains pages, reviews PRs, helps with LeetCode, career advice & more!",
   "icons": {
     "16": "icons/icon16.png",
@@ -40,6 +40,8 @@
         "content/storage.js",
         "content/pageExtractor.js",
         "content/drag.js",
+        "content/streamManager.js",
+        "content/scrollManager.js",
         "content/chatUI.js",
         "content/widget.js"
       ],

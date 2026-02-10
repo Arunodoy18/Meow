@@ -1,8 +1,8 @@
 /**
- * Meow AI - Widget Orchestrator
+ * Meow AI - Widget Orchestrator (v2.1 Streaming)
  * Main entry point: wires all modules together.
- * Handles init, keyboard shortcuts, API calls, SPA nav,
- * and chrome.runtime messaging.
+ * Handles init, keyboard shortcuts, streaming API calls,
+ * SPA nav, and chrome.runtime messaging.
  */
 
 (() => {
@@ -10,16 +10,16 @@
 
   // ==================== CONFIG ====================
 
-  const BACKEND_API_URL = 'https://meow-ai-backend.meow-ai-arunodoy.workers.dev/api/chat';
   const MAX_HISTORY_SIZE = 20;
   const CONTEXT_WINDOW_SIZE = 6;
 
   // ==================== STATE ====================
 
-  let chatHistory = [];   // API memory: [{role, content}]
-  let isProcessing = false;
+  let chatHistory = [];        // API memory: [{role, content}]
+  let _lastUserMessage = '';   // for retry
+  let _lastMode = 'general';
 
-  // ==================== API ====================
+  // ==================== HISTORY ====================
 
   function addToHistory(role, content) {
     chatHistory.push({ role, content });
@@ -32,117 +32,129 @@
     return chatHistory.slice(-CONTEXT_WINDOW_SIZE);
   }
 
+  // ==================== MESSAGE BUILDER ====================
+
   /**
-   * Call backend API with conversation context
+   * Build the full message with page context and conversation history.
    */
-  async function callBackendAPI(userMessage) {
+  function _buildMessage(userMessage) {
     const pageData = MeowPageExtractor.extractPageContent();
     const mode = pageData.mode;
     const systemPrompt = MeowPageExtractor.getSystemPrompt(mode);
 
-    // Build conversation context
     let conversationContext = '';
     getRecentHistory().forEach(msg => {
       conversationContext += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
     });
 
-    // Determine if page context should be included
     const isFirstMsg = chatHistory.length <= 1;
     const wantsPage = MeowPageExtractor.isPageQuery(userMessage);
 
-    let message;
     if (isFirstMsg && wantsPage) {
-      message = `${systemPrompt}\n\nPage Title: ${pageData.title}\nMode: ${mode}\n\nPage Content:\n${pageData.textContent.substring(0, 3000)}\n\nUser Question: ${userMessage}\n\nProvide elite-level analysis.`;
+      return `${systemPrompt}\n\nPage Title: ${pageData.title}\nMode: ${mode}\n\nPage Content:\n${pageData.textContent.substring(0, 3000)}\n\nUser Question: ${userMessage}\n\nProvide elite-level analysis.`;
     } else if (wantsPage) {
-      message = `Page Title: ${pageData.title}\n${pageData.textContent.substring(0, 2000)}\n\nConversation:\n${conversationContext}\nUser: ${userMessage}`;
-    } else {
-      message = userMessage;
+      return `Page Title: ${pageData.title}\n${pageData.textContent.substring(0, 2000)}\n\nConversation:\n${conversationContext}\nUser: ${userMessage}`;
+    } else if (conversationContext) {
+      return `Conversation:\n${conversationContext}\nUser: ${userMessage}`;
     }
+    return userMessage;
+  }
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
+  // ==================== STREAMING CALLBACKS ====================
 
-      const response = await fetch(BACKEND_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, mode }),
-        signal: controller.signal
-      });
+  function _setupStreamCallbacks() {
+    // Show typing dots while connecting
+    MeowStreamManager.onStateChange((state) => {
+      if (state === MeowStreamManager.STATE.CONNECTING) {
+        MeowChatUI.showTyping();
+      }
+    });
 
-      clearTimeout(timeoutId);
+    // On each chunk → update streaming message UI
+    MeowStreamManager.onChunk((msgId, fullContent) => {
+      MeowChatUI.hideTyping();
 
-      if (!response.ok) {
-        const statusMessages = {
-          429: 'Rate limit reached. Please wait a moment.',
-          500: 'Backend error. Please try again later.',
-          503: 'AI model is loading. Try again in 20 seconds.'
-        };
-        return statusMessages[response.status] || `Error: Server returned ${response.status}`;
+      if (!MeowChatUI.hasStreamingMessage(msgId)) {
+        MeowChatUI.createStreamingMessage(msgId);
+      }
+      MeowChatUI.appendStreamChunk(msgId, fullContent);
+      MeowScrollManager.scrollOnChunk();
+    });
+
+    // On finalize → finish message, save to history, re-enable input
+    MeowStreamManager.onFinalize((msgId, fullContent, wasError) => {
+      MeowChatUI.hideTyping();
+
+      // If we finalize before any chunks arrived (error before first chunk)
+      if (!MeowChatUI.hasStreamingMessage(msgId) && fullContent) {
+        MeowChatUI.createStreamingMessage(msgId);
+        MeowChatUI.appendStreamChunk(msgId, fullContent);
       }
 
-      const data = await response.json();
-      if (data.success && data.response) {
-        return data.response.trim();
-      }
-      return data.error || 'Unexpected response format.';
+      MeowChatUI.finalizeStreamMessage(msgId, wasError);
 
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        return 'Request timed out. The AI took too long to respond. Try again.';
+      if (fullContent && !wasError) {
+        addToHistory('assistant', fullContent);
       }
-      if (!navigator.onLine) {
-        return 'You appear to be offline. Check your connection and try again.';
+
+      if (wasError) {
+        MeowChatUI.showRetryButton(msgId, handleRetry);
       }
-      console.error('🐱 API error:', error);
-      return 'Meow AI is having trouble responding. Try again.';
-    }
+
+      MeowScrollManager.forceScrollToBottom();
+      MeowChatUI.setInputEnabled(true);
+    });
   }
 
   // ==================== SEND MESSAGE FLOW ====================
 
   async function handleSendMessage(userMessage) {
-    if (isProcessing || !userMessage) return;
-    isProcessing = true;
+    if (MeowStreamManager.isStreaming() || !userMessage) return;
 
-    // 1. Show user message
+    // Store for retry
+    _lastUserMessage = userMessage;
+    _lastMode = MeowPageExtractor.detectPageMode(window.location.href);
+
+    // Show user message
     MeowChatUI.addMessage('user', userMessage);
     addToHistory('user', userMessage);
+    MeowScrollManager.scrollToBottom();
 
-    // 2. Disable input, show typing
+    // Disable input
     MeowChatUI.setInputEnabled(false);
-    MeowChatUI.showTyping();
 
-    try {
-      // 3. Call API
-      const aiResponse = await callBackendAPI(userMessage);
+    // Build message with page context + history
+    const message = _buildMessage(userMessage);
 
-      // 4. Show response
-      MeowChatUI.hideTyping();
-      MeowChatUI.addMessage('ai', aiResponse);
-      addToHistory('assistant', aiResponse);
+    // Start streaming — callbacks handle UI updates
+    await MeowStreamManager.startStream(message, _lastMode);
+  }
 
-    } catch (error) {
-      console.error('🐱 Chat error:', error);
-      MeowChatUI.hideTyping();
-      const errMsg = 'Meow AI is having trouble responding. Try again.';
-      MeowChatUI.addMessage('ai', errMsg);
-      addToHistory('assistant', errMsg);
-    } finally {
-      MeowChatUI.setInputEnabled(true);
-      isProcessing = false;
-    }
+  // ==================== RETRY ====================
+
+  async function handleRetry() {
+    if (MeowStreamManager.isStreaming() || !_lastUserMessage) return;
+
+    MeowChatUI.setInputEnabled(false);
+    const message = _buildMessage(_lastUserMessage);
+    await MeowStreamManager.startStream(message, _lastMode);
   }
 
   // ==================== DISABLE HANDLER ====================
 
   async function handleDisable(action) {
+    MeowStreamManager.abortCurrentStream();
+
     if (action === 'disable-24h') {
       await MeowStorage.disableSite(true);
+      MeowStreamManager.destroy();
+      MeowScrollManager.destroy();
       MeowChatUI.destroy();
       MeowDrag.destroy();
     } else if (action === 'disable-site') {
       await MeowStorage.disableSite(false);
+      MeowStreamManager.destroy();
+      MeowScrollManager.destroy();
       MeowChatUI.destroy();
       MeowDrag.destroy();
     }
@@ -158,8 +170,11 @@
         MeowChatUI.togglePanel();
       }
 
-      // Escape → close panel
+      // Escape → close panel (abort stream if active)
       if (e.key === 'Escape' && MeowChatUI.isPanelOpen()) {
+        if (MeowStreamManager.isStreaming()) {
+          MeowStreamManager.abortCurrentStream();
+        }
         MeowChatUI.closePanel();
       }
     });
@@ -170,6 +185,11 @@
   function setupSPAWatcher() {
     MeowPageExtractor.initSPAWatcher();
     MeowPageExtractor.onNavigate((url) => {
+      // Abort active stream on navigation
+      if (MeowStreamManager.isStreaming()) {
+        MeowStreamManager.abortCurrentStream();
+      }
+
       const newMode = MeowPageExtractor.detectPageMode(url);
       MeowChatUI.updateMode(newMode);
       console.log('🐱 SPA navigation detected → mode:', newMode);
@@ -192,6 +212,16 @@
         sendResponse({ success: false, error: error.message });
       }
       return true;
+    });
+  }
+
+  // ==================== TAB VISIBILITY ====================
+
+  function setupVisibilityHandler() {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && MeowStreamManager.isStreaming()) {
+        console.log('🐱 Tab hidden during stream — stream continues in background');
+      }
     });
   }
 
@@ -219,6 +249,15 @@
       // Init dragging
       MeowDrag.init(toggleButton);
 
+      // Init scroll manager (bind to messages container)
+      const messagesContainer = panel.querySelector('.meow-chat-messages');
+      if (messagesContainer) {
+        MeowScrollManager.init(messagesContainer);
+      }
+
+      // Wire streaming callbacks
+      _setupStreamCallbacks();
+
       // Toggle button click (only if not dragged)
       toggleButton.addEventListener('click', () => {
         if (!MeowDrag.wasDragged()) {
@@ -226,7 +265,7 @@
         }
       });
 
-      // Wire callbacks
+      // Wire UI callbacks
       MeowChatUI.onSend(handleSendMessage);
       MeowChatUI.onDisable(handleDisable);
 
@@ -234,8 +273,9 @@
       setupKeyboardShortcuts();
       setupSPAWatcher();
       setupMessageListener();
+      setupVisibilityHandler();
 
-      console.log('🐱 Meow AI v2.0 initialized | Mode:', MeowPageExtractor.detectPageMode(window.location.href));
+      console.log('🐱 Meow AI v2.1 (streaming) initialized | Mode:', MeowPageExtractor.detectPageMode(window.location.href));
 
     } catch (error) {
       console.error('🐱 Meow AI init failed:', error);

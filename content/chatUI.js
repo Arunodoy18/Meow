@@ -17,6 +17,9 @@ const MeowChatUI = (() => {
 
   const DEBOUNCE_MS = 150;
 
+  /** @type {Map<string, {element: HTMLElement, bubble: HTMLElement, textNode: Text}>} */
+  const _streamingMessages = new Map();
+
   // ==================== STYLE INJECTION ====================
 
   function injectStyles() {
@@ -503,6 +506,49 @@ const MeowChatUI = (() => {
       .meow-offline-banner.visible {
         display: block;
       }
+
+      /* ==================== STREAMING ==================== */
+      .meow-streaming-cursor {
+        display: inline-block;
+        width: 2px;
+        height: 1em;
+        background: var(--meow-primary);
+        margin-left: 2px;
+        vertical-align: text-bottom;
+        animation: meowBlink 0.8s step-end infinite;
+      }
+
+      @keyframes meowBlink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
+      .meow-message-bubble.streaming {
+        min-height: 1.55em;
+      }
+
+      .meow-retry-btn {
+        all: initial;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 12px;
+        margin-top: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--meow-primary);
+        background: rgba(124, 58, 237, 0.08);
+        border: 1px solid rgba(124, 58, 237, 0.18);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: var(--meow-font);
+      }
+
+      .meow-retry-btn:hover {
+        background: rgba(124, 58, 237, 0.15);
+        border-color: var(--meow-primary-light);
+      }
     `;
 
     document.head.appendChild(style);
@@ -746,6 +792,115 @@ const MeowChatUI = (() => {
     if (el) el.remove();
   }
 
+  // ==================== STREAMING MESSAGE METHODS ====================
+
+  /**
+   * Check if a streaming message exists.
+   * @param {string} msgId
+   * @returns {boolean}
+   */
+  function hasStreamingMessage(msgId) {
+    return _streamingMessages.has(msgId);
+  }
+
+  /**
+   * Create a streaming AI message with a blinking cursor.
+   * @param {string} msgId - Unique message ID from stream manager
+   * @returns {HTMLElement} The message element
+   */
+  function createStreamingMessage(msgId) {
+    const container = _panel?.querySelector('.meow-chat-messages');
+    if (!container) return null;
+
+    // Remove welcome on first message
+    const welcome = container.querySelector('.meow-welcome');
+    if (welcome) welcome.remove();
+
+    const el = document.createElement('div');
+    el.className = 'meow-message ai';
+    el.dataset.msgId = msgId;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'meow-message-bubble streaming';
+
+    const textNode = document.createTextNode('');
+    bubble.appendChild(textNode);
+
+    const cursor = document.createElement('span');
+    cursor.className = 'meow-streaming-cursor';
+    bubble.appendChild(cursor);
+
+    el.appendChild(bubble);
+    container.appendChild(el);
+
+    _streamingMessages.set(msgId, { element: el, bubble, textNode });
+    return el;
+  }
+
+  /**
+   * Update streaming message content via RAF.
+   * NEVER recreates DOM — only updates textContent.
+   * @param {string} msgId
+   * @param {string} fullContent - Complete accumulated content
+   */
+  function appendStreamChunk(msgId, fullContent) {
+    const entry = _streamingMessages.get(msgId);
+    if (!entry) return;
+
+    requestAnimationFrame(() => {
+      entry.textNode.textContent = fullContent;
+    });
+  }
+
+  /**
+   * Finalize a streaming message: remove cursor, add timestamp.
+   * @param {string} msgId
+   * @param {boolean} wasError
+   */
+  function finalizeStreamMessage(msgId, wasError) {
+    const entry = _streamingMessages.get(msgId);
+    if (!entry) return;
+
+    const { bubble, element } = entry;
+
+    // Remove cursor
+    const cursor = bubble.querySelector('.meow-streaming-cursor');
+    if (cursor) cursor.remove();
+    bubble.classList.remove('streaming');
+
+    if (wasError) {
+      bubble.style.borderColor = 'rgba(220, 38, 38, 0.3)';
+    }
+
+    // Add timestamp
+    const time = document.createElement('div');
+    time.className = 'meow-message-time';
+    time.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    element.appendChild(time);
+
+    _streamingMessages.delete(msgId);
+  }
+
+  /**
+   * Show a retry button below a failed message.
+   * @param {string} msgId
+   * @param {Function} callback
+   */
+  function showRetryButton(msgId, callback) {
+    const el = _panel?.querySelector(`[data-msg-id="${msgId}"]`);
+    if (!el) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'meow-retry-btn';
+    btn.innerHTML = '🔄 Retry';
+    btn.addEventListener('click', () => {
+      btn.remove();
+      if (callback) callback();
+    });
+
+    el.appendChild(btn);
+  }
+
   // ==================== PANEL CONTROL ====================
 
   function openPanel() {
@@ -815,6 +970,11 @@ const MeowChatUI = (() => {
     addMessage,
     showTyping,
     hideTyping,
+    hasStreamingMessage,
+    createStreamingMessage,
+    appendStreamChunk,
+    finalizeStreamMessage,
+    showRetryButton,
     openPanel,
     closePanel,
     togglePanel,

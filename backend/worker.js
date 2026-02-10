@@ -234,6 +234,138 @@ async function callGeminiAPI(message, apiKey, mode = 'general') {
   }
 }
 
+// ==================== STREAMING HANDLER ====================
+
+/**
+ * Handle streaming chat requests via SSE.
+ * Calls Gemini streamGenerateContent and pipes chunks to client.
+ *
+ * @param {Object} body - Validated request body
+ * @param {string} apiKey - Gemini API key
+ * @returns {Response} SSE streaming response
+ */
+async function handleStreamRequest(body, apiKey) {
+  const apiUrl = `${CONFIG.GEMINI_API_BASE}/${CONFIG.MODEL_NAME}:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s for streaming
+
+    const geminiResponse = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: body.message }] }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text().catch(() => '');
+      console.error('Gemini Stream Error:', geminiResponse.status, errorText);
+
+      const status = geminiResponse.status === 429 ? 429 :
+                     (geminiResponse.status === 401 || geminiResponse.status === 403) ? 503 : 500;
+      return new Response(
+        JSON.stringify({ error: 'AI service error' }),
+        { status, headers: { 'Content-Type': 'application/json', ...getCorsHeaders() } }
+      );
+    }
+
+    // Transform Gemini SSE → our SSE format via TransformStream
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const reader = geminiResponse.body.getReader();
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+
+    // Process stream in background (non-blocking)
+    (async () => {
+      let buffer = '';
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Split on SSE event boundaries
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
+
+          for (const event of events) {
+            for (const line of event.split('\n')) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6).trim();
+                try {
+                  const parsed = JSON.parse(data);
+                  const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+                  if (text) {
+                    await writer.write(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
+                  }
+                } catch (e) {
+                  // Skip unparseable chunks
+                }
+              }
+            }
+          }
+        }
+
+        // Process remaining buffer
+        if (buffer.trim()) {
+          for (const line of buffer.split('\n')) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
+              try {
+                const parsed = JSON.parse(data);
+                const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                  await writer.write(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
+                }
+              } catch (e) { /* skip */ }
+            }
+          }
+        }
+
+        // Send done marker
+        await writer.write(encoder.encode('data: [DONE]\n\n'));
+      } catch (err) {
+        console.error('Stream pipe error:', err);
+        try {
+          await writer.write(encoder.encode(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`));
+        } catch (e) { /* writer closed */ }
+      } finally {
+        try { await writer.close(); } catch (e) { /* noop */ }
+      }
+    })();
+
+    return new Response(readable, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        ...getCorsHeaders(),
+      },
+    });
+
+  } catch (error) {
+    console.error('Stream handler error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json', ...getCorsHeaders() } }
+    );
+  }
+}
+
 // ==================== ERROR RESPONSE BUILDER ====================
 
 /**
@@ -389,7 +521,16 @@ export default {
       );
     }
     
-    // ==================== API CALL ====================
+    // ==================== ROUTING ====================
+
+    const url = new URL(request.url);
+
+    // Streaming endpoint
+    if (url.pathname === '/api/chat/stream') {
+      return handleStreamRequest(body, env.GEMINI_API_KEY);
+    }
+
+    // ==================== NON-STREAMING API CALL ====================
     
     try {
       // SECURITY: API key from environment, never exposed to client
