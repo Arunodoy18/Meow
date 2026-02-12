@@ -14,14 +14,24 @@ const MeowStorage = (() => {
     USER_PREFS: 'meow_user_prefs'
   };
 
+  // ==================== CONTEXT VALIDATION ====================
+
+  function _isContextInvalidated() {
+    try {
+      return !chrome?.runtime?.id;
+    } catch (e) {
+      return true;
+    }
+  }
+
   // ==================== CHROME STORAGE WRAPPER ====================
 
   function _get(key) {
     return new Promise((resolve) => {
-      if (chrome?.storage?.local) {
+      if (chrome?.storage?.local && !_isContextInvalidated()) {
         chrome.storage.local.get([key], (result) => {
           if (chrome.runtime.lastError) {
-            console.warn('🐱 Storage read error:', chrome.runtime.lastError.message);
+            // During extension reload, context becomes invalid - fallback silently
             resolve(_localGet(key));
           } else {
             resolve(result[key] ?? null);
@@ -35,10 +45,10 @@ const MeowStorage = (() => {
 
   function _set(key, value) {
     return new Promise((resolve) => {
-      if (chrome?.storage?.local) {
+      if (chrome?.storage?.local && !_isContextInvalidated()) {
         chrome.storage.local.set({ [key]: value }, () => {
           if (chrome.runtime.lastError) {
-            console.warn('🐱 Storage write error:', chrome.runtime.lastError.message);
+            // During extension reload, context becomes invalid - fallback silently
             _localSet(key, value);
           }
           resolve();

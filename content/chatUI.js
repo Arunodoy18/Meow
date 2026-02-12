@@ -29,18 +29,22 @@ const MeowChatUI = (() => {
     const style = document.createElement('style');
     style.id = id;
     style.textContent = `
-      /* ==================== GLASSMORPHISM VARIABLES ==================== */
+      /* ==================== NEO DEV DARK VARIABLES ==================== */
       :root {
-        --meow-primary: #7c3aed;
-        --meow-primary-light: #a78bfa;
-        --meow-primary-dark: #5b21b6;
-        --meow-accent: #06b6d4;
-        --meow-glass-bg: rgba(255, 255, 255, 0.72);
-        --meow-glass-border: rgba(255, 255, 255, 0.3);
-        --meow-glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.18);
+        --meow-primary: #22C55E;
+        --meow-primary-light: #4ADE80;
+        --meow-primary-dark: #16A34A;
+        --meow-accent: #3B82F6;
+        --meow-bg: #0B0F14;
+        --meow-panel-bg: #111827;
+        --meow-glass-bg: rgba(17, 24, 39, 0.95);
+        --meow-glass-border: rgba(34, 197, 94, 0.15);
+        --meow-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
         --meow-blur: 18px;
         --meow-radius: 16px;
         --meow-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+        --meow-text-primary: #E5E7EB;
+        --meow-text-secondary: #9CA3AF;
       }
 
       /* ==================== TOGGLE BUTTON ==================== */
@@ -52,9 +56,9 @@ const MeowChatUI = (() => {
         width: 58px;
         height: 58px;
         border-radius: 50%;
-        background: linear-gradient(135deg, var(--meow-primary) 0%, var(--meow-accent) 100%);
-        border: 2px solid var(--meow-glass-border);
-        box-shadow: var(--meow-glass-shadow), 0 0 0 0 rgba(124, 58, 237, 0.4);
+        background: linear-gradient(135deg, var(--meow-primary) 0%, #16A34A 100%);
+        border: 2px solid rgba(34, 197, 94, 0.3);
+        box-shadow: var(--meow-glass-shadow), 0 0 0 0 rgba(34, 197, 94, 0.4);
         cursor: pointer;
         z-index: 2147483646;
         font-size: 26px;
@@ -69,26 +73,26 @@ const MeowChatUI = (() => {
       }
 
       .meow-chat-toggle:hover {
-        box-shadow: var(--meow-glass-shadow), 0 0 0 6px rgba(124, 58, 237, 0.18);
+        box-shadow: var(--meow-glass-shadow), 0 0 0 6px rgba(34, 197, 94, 0.25);
         transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.08);
       }
 
       .meow-dragging {
         animation: none !important;
-        box-shadow: 0 12px 40px rgba(31, 38, 135, 0.3) !important;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5) !important;
         opacity: 0.9;
       }
 
       @keyframes meowPulse {
-        0%, 100% { box-shadow: var(--meow-glass-shadow), 0 0 0 0 rgba(124, 58, 237, 0.3); }
-        50% { box-shadow: var(--meow-glass-shadow), 0 0 0 8px rgba(124, 58, 237, 0); }
+        0%, 100% { box-shadow: var(--meow-glass-shadow), 0 0 0 0 rgba(34, 197, 94, 0.3); }
+        50% { box-shadow: var(--meow-glass-shadow), 0 0 0 8px rgba(34, 197, 94, 0); }
       }
 
       .meow-chat-toggle.panel-open {
         animation: none;
       }
 
-      /* ==================== CHAT PANEL (GLASSMORPHISM) ==================== */
+      /* ==================== CHAT PANEL (NEO DEV DARK) ==================== */
       .meow-chat-panel {
         all: initial;
         position: fixed;
@@ -97,17 +101,17 @@ const MeowChatUI = (() => {
         width: 400px;
         height: 100vh;
         height: 100dvh;
-        background: var(--meow-glass-bg);
+        background: var(--meow-panel-bg);
         backdrop-filter: blur(var(--meow-blur));
         -webkit-backdrop-filter: blur(var(--meow-blur));
         border-left: 1px solid var(--meow-glass-border);
-        box-shadow: -8px 0 32px rgba(31, 38, 135, 0.12);
+        box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
         z-index: 2147483647;
         display: flex;
         flex-direction: column;
         transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         font-family: var(--meow-font);
-        color: #1e1b4b;
+        color: var(--meow-text-primary);
       }
 
       .meow-chat-panel.open {
@@ -116,7 +120,8 @@ const MeowChatUI = (() => {
 
       /* ==================== HEADER ==================== */
       .meow-chat-header {
-        background: linear-gradient(135deg, var(--meow-primary) 0%, var(--meow-accent) 100%);
+        background: var(--meow-bg);
+        border-bottom: 1px solid rgba(34, 197, 94, 0.2);
         color: white;
         padding: 14px 18px;
         display: flex;
@@ -152,12 +157,14 @@ const MeowChatUI = (() => {
         font-size: 16px;
         font-weight: 700;
         letter-spacing: -0.3px;
+        color: var(--meow-primary);
       }
 
       .meow-header-mode {
         font-size: 11px;
         opacity: 0.85;
         font-weight: 400;
+        color: var(--meow-text-secondary);
       }
 
       .meow-chat-close {
@@ -189,12 +196,12 @@ const MeowChatUI = (() => {
         top: 100%;
         right: 8px;
         margin-top: 6px;
-        background: var(--meow-glass-bg);
+        background: var(--meow-bg);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
         border: 1px solid var(--meow-glass-border);
         border-radius: 12px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
         min-width: 210px;
         padding: 6px 0;
         z-index: 2147483647;
@@ -216,19 +223,19 @@ const MeowChatUI = (() => {
         cursor: pointer;
         font-size: 13px;
         font-weight: 500;
-        color: #1e1b4b;
+        color: var(--meow-text-primary);
         transition: background 0.15s;
         width: 100%;
         font-family: var(--meow-font);
       }
 
       .meow-disable-item:hover {
-        background: rgba(124, 58, 237, 0.08);
+        background: rgba(34, 197, 94, 0.1);
       }
 
       .meow-disable-divider {
         height: 1px;
-        background: rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.08);
         margin: 4px 0;
       }
 
@@ -244,7 +251,7 @@ const MeowChatUI = (() => {
         display: flex;
         flex-direction: column;
         gap: 10px;
-        background: linear-gradient(180deg, rgba(245, 243, 255, 0.5) 0%, rgba(240, 249, 255, 0.5) 100%);
+        background: var(--meow-panel-bg);
       }
 
       .meow-message {
@@ -277,23 +284,24 @@ const MeowChatUI = (() => {
       }
 
       .meow-message.user .meow-message-bubble {
-        background: linear-gradient(135deg, var(--meow-primary) 0%, #6d28d9 100%);
-        color: white;
+        background: linear-gradient(135deg, var(--meow-primary) 0%, #16A34A 100%);
+        color: #0B0F14;
+        font-weight: 500;
         border-bottom-right-radius: 4px;
       }
 
       .meow-message.ai .meow-message-bubble {
-        background: var(--meow-glass-bg);
+        background: rgba(17, 24, 39, 0.8);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
-        color: #1e1b4b;
-        border: 1px solid rgba(124, 58, 237, 0.12);
+        color: var(--meow-text-primary);
+        border: 1px solid rgba(34, 197, 94, 0.12);
         border-bottom-left-radius: 4px;
       }
 
       .meow-message-time {
         font-size: 10px;
-        color: #94a3b8;
+        color: var(--meow-text-secondary);
         margin-top: 3px;
         padding: 0 4px;
       }
@@ -332,7 +340,7 @@ const MeowChatUI = (() => {
       .meow-welcome {
         text-align: center;
         padding: 32px 16px;
-        color: #64748b;
+        color: var(--meow-text-secondary);
       }
 
       .meow-welcome-icon {
@@ -343,14 +351,14 @@ const MeowChatUI = (() => {
       .meow-welcome-title {
         font-size: 17px;
         font-weight: 700;
-        color: #1e1b4b;
+        color: var(--meow-primary);
         margin-bottom: 6px;
       }
 
       .meow-welcome-text {
         font-size: 12.5px;
         line-height: 1.6;
-        color: #64748b;
+        color: var(--meow-text-secondary);
       }
 
       .meow-quick-actions {
@@ -363,33 +371,29 @@ const MeowChatUI = (() => {
       .meow-quick-btn {
         all: initial;
         padding: 9px 14px;
-        background: var(--meow-glass-bg);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        border: 1px solid rgba(124, 58, 237, 0.12);
+        background: rgba(11, 15, 20, 0.6);
+        border: 1px solid rgba(34, 197, 94, 0.15);
         border-radius: 10px;
         cursor: pointer;
         font-size: 12.5px;
         font-weight: 500;
-        color: #1e1b4b;
+        color: var(--meow-text-primary);
         transition: all 0.2s;
         text-align: left;
         font-family: var(--meow-font);
       }
 
       .meow-quick-btn:hover {
-        border-color: var(--meow-primary-light);
-        background: rgba(124, 58, 237, 0.06);
+        border-color: var(--meow-primary);
+        background: rgba(34, 197, 94, 0.08);
         transform: translateX(4px);
       }
 
       /* ==================== INPUT AREA ==================== */
       .meow-chat-input {
         padding: 12px 16px;
-        background: var(--meow-glass-bg);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-top: 1px solid var(--meow-glass-border);
+        background: var(--meow-bg);
+        border-top: 1px solid rgba(34, 197, 94, 0.15);
         flex-shrink: 0;
       }
 
@@ -403,26 +407,26 @@ const MeowChatUI = (() => {
         all: initial;
         flex: 1;
         padding: 10px 14px;
-        border: 1px solid rgba(124, 58, 237, 0.18);
+        border: 1px solid rgba(34, 197, 94, 0.2);
         border-radius: 12px;
         font-size: 13.5px;
         font-family: var(--meow-font);
         resize: none;
         max-height: 120px;
-        background: rgba(255, 255, 255, 0.8);
-        color: #1e1b4b;
+        background: var(--meow-panel-bg);
+        color: var(--meow-text-primary);
         transition: border-color 0.2s, box-shadow 0.2s;
         line-height: 1.4;
       }
 
       .meow-chat-textarea:focus {
         outline: none;
-        border-color: var(--meow-primary-light);
-        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        border-color: var(--meow-primary);
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
       }
 
       .meow-chat-textarea::placeholder {
-        color: #94a3b8;
+        color: var(--meow-text-secondary);
       }
 
       .meow-send-btn {
@@ -430,9 +434,9 @@ const MeowChatUI = (() => {
         width: 40px;
         height: 40px;
         border-radius: 12px;
-        background: linear-gradient(135deg, var(--meow-primary) 0%, var(--meow-accent) 100%);
+        background: var(--meow-primary);
         border: none;
-        color: white;
+        color: #0B0F14;
         font-size: 16px;
         cursor: pointer;
         flex-shrink: 0;
@@ -440,11 +444,13 @@ const MeowChatUI = (() => {
         display: flex;
         align-items: center;
         justify-content: center;
+        font-weight: 700;
       }
 
       .meow-send-btn:hover {
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+        background: var(--meow-primary-light);
       }
 
       .meow-send-btn:disabled {
@@ -457,7 +463,7 @@ const MeowChatUI = (() => {
       .meow-kb-hint {
         text-align: center;
         font-size: 10px;
-        color: #94a3b8;
+        color: var(--meow-text-secondary);
         margin-top: 6px;
         font-family: var(--meow-font);
       }
@@ -467,9 +473,9 @@ const MeowChatUI = (() => {
         padding: 1px 5px;
         font-size: 10px;
         font-family: var(--meow-font);
-        color: #64748b;
-        background: rgba(0, 0, 0, 0.04);
-        border: 1px solid rgba(0, 0, 0, 0.08);
+        color: var(--meow-text-secondary);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 4px;
       }
 
@@ -483,24 +489,25 @@ const MeowChatUI = (() => {
       }
 
       .meow-chat-messages::-webkit-scrollbar-thumb {
-        background: rgba(124, 58, 237, 0.2);
+        background: rgba(34, 197, 94, 0.2);
         border-radius: 4px;
       }
 
       .meow-chat-messages::-webkit-scrollbar-thumb:hover {
-        background: rgba(124, 58, 237, 0.35);
+        background: rgba(34, 197, 94, 0.35);
       }
 
       /* ==================== OFFLINE BANNER ==================== */
       .meow-offline-banner {
-        background: #fef3c7;
-        color: #92400e;
+        background: rgba(234, 179, 8, 0.15);
+        color: #EAB308;
         padding: 8px 14px;
         font-size: 12px;
         font-weight: 500;
         text-align: center;
         display: none;
         font-family: var(--meow-font);
+        border-bottom: 1px solid rgba(234, 179, 8, 0.2);
       }
 
       .meow-offline-banner.visible {
@@ -537,8 +544,8 @@ const MeowChatUI = (() => {
         font-size: 12px;
         font-weight: 500;
         color: var(--meow-primary);
-        background: rgba(124, 58, 237, 0.08);
-        border: 1px solid rgba(124, 58, 237, 0.18);
+        background: rgba(34, 197, 94, 0.08);
+        border: 1px solid rgba(34, 197, 94, 0.2);
         border-radius: 8px;
         cursor: pointer;
         transition: all 0.2s;
@@ -546,8 +553,8 @@ const MeowChatUI = (() => {
       }
 
       .meow-retry-btn:hover {
-        background: rgba(124, 58, 237, 0.15);
-        border-color: var(--meow-primary-light);
+        background: rgba(34, 197, 94, 0.15);
+        border-color: var(--meow-primary);
       }
 
       /* ==================== THINKING INDICATOR ==================== */
@@ -558,7 +565,7 @@ const MeowChatUI = (() => {
         padding: 10px 16px;
         align-self: flex-start;
         font-size: 12px;
-        color: #7c3aed;
+        color: var(--meow-primary);
         font-family: var(--meow-font);
         animation: meowMsgSlide 0.25s ease;
       }
@@ -598,7 +605,12 @@ const MeowChatUI = (() => {
   }
 
   function createPanel() {
-    const mode = MeowPageExtractor.detectPageMode(window.location.href);
+    let mode = 'General Analysis';
+    try {
+      mode = MeowPageExtractor.detectPageMode(window.location.href);
+    } catch (e) {
+      console.warn('🐱 Mode detection failed, using default:', e);
+    }
 
     _panel = document.createElement('div');
     _panel.className = 'meow-chat-panel';
@@ -677,16 +689,22 @@ const MeowChatUI = (() => {
 
     // Append to header so it positions correctly
     const header = _panel.querySelector('.meow-chat-header');
-    header.style.position = 'relative';
-    header.appendChild(_disableMenu);
+    if (header) {
+      header.style.position = 'relative';
+      header.appendChild(_disableMenu);
+    } else {
+      console.warn('🐱 Chat header not found, appending disable menu to panel');
+      _panel.appendChild(_disableMenu);
+    }
   }
 
   function _showDisableMenu() {
+    if (!_disableMenu) return;
     _disableMenu.style.display = 'block';
 
     const closeMenu = (e) => {
-      if (!_disableMenu.contains(e.target)) {
-        _disableMenu.style.display = 'none';
+      if (!_disableMenu || !_disableMenu.contains(e.target)) {
+        if (_disableMenu) _disableMenu.style.display = 'none';
         document.removeEventListener('click', closeMenu, true);
       }
     };
@@ -698,10 +716,12 @@ const MeowChatUI = (() => {
   function _setupPanelEvents() {
     // Close button → show disable menu
     const closeBtn = _panel.querySelector('.meow-chat-close');
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      _showDisableMenu();
-    });
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _showDisableMenu();
+      });
+    }
 
     // Disable menu items
     _disableMenu.querySelectorAll('.meow-disable-item').forEach(item => {

@@ -15,8 +15,8 @@ compatibility_date = "2024-01-01"
 ENVIRONMENT = "production"
 
 # Secrets (sensitive - set via CLI)
-# DO NOT add HUGGINGFACE_API_KEY here!
-# Set via: wrangler secret put HUGGINGFACE_API_KEY
+# DO NOT add GEMINI_API_KEY here!
+# Set via: wrangler secret put GEMINI_API_KEY
 
 # Custom domains (optional - after deployment)
 # routes = [

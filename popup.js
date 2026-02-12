@@ -1,5 +1,5 @@
 ﻿/**
- * Meow AI - Popup Script v2.0
+ * Meow AI - Popup Script v3.0
  * Handles popup UI, page analysis, and backend API calls.
  * Backend: Cloudflare Workers -> Gemini 2.5 Flash
  */
@@ -11,27 +11,43 @@ const BACKEND_API_URL = 'https://meow-ai-backend.meow-ai-arunodoy.workers.dev/ap
 const MODES = {
   pr_review: {
     label: 'PR Review',
-    systemPrompt: 'You are Meow AI - an elite code reviewer. Provide: SUMMARY, KEY CONCERNS, STRENGTHS, IMPROVEMENTS, MERGE RECOMMENDATION. Be concise and actionable.'
+    systemPrompt: 'You are Meow AI — an elite code reviewer. Provide: SUMMARY, KEY CONCERNS, STRENGTHS, IMPROVEMENTS, MERGE RECOMMENDATION. Suggest test cases. Be specific and actionable.'
   },
   github_analysis: {
     label: 'GitHub Analysis',
-    systemPrompt: 'You are Meow AI - a senior engineering analyst. Provide: SUMMARY, TECHNICAL DEPTH, WHY THIS MATTERS, KEY TAKEAWAY.'
+    systemPrompt: 'You are Meow AI — a senior engineering analyst. Provide: SUMMARY, TECHNICAL DEPTH, WHY THIS MATTERS IN REAL WORLD, POTENTIAL RISKS, KEY TAKEAWAY.'
   },
   job_analysis: {
     label: 'Job Analysis',
-    systemPrompt: 'You are Meow AI - an elite career strategist. Provide: ROLE SUMMARY, SKILL GAP ANALYSIS, COMPETITIVE ADVANTAGE, NEXT STEPS.'
+    systemPrompt: 'You are Meow AI — an elite career strategist. Provide: ROLE SUMMARY, SKILL GAP ANALYSIS, COMPETITIVE ADVANTAGE, PREPARATION PLAN, NEXT STEPS. Suggest high ROI skills.'
   },
   dsa_problem: {
     label: 'DSA Problem',
-    systemPrompt: 'You are Meow AI - an elite CS tutor. Guide with hints. Provide: PROBLEM TYPE, KEY INSIGHT, APPROACH HINT, COMPLEXITY ANALYSIS. Teach, don\'t solve.'
+    systemPrompt: 'You are Meow AI — an elite CS tutor. HINT-FIRST: Guide with direction, not answers. Provide: PROBLEM TYPE, KEY INSIGHT, APPROACH HINT, COMPLEXITY ANALYSIS. Only show full solution if explicitly asked.'
   },
   learning_mode: {
     label: 'Learning Mode',
-    systemPrompt: 'You are Meow AI - an elite technical educator. Provide: CORE CONCEPTS, KEY TAKEAWAYS, PRACTICAL APPLICATION, LEARN NEXT.'
+    systemPrompt: 'You are Meow AI — an elite technical educator. Provide: CORE CONCEPTS, KEY TAKEAWAYS, PRACTICAL APPLICATION, LEARN NEXT. Focus on retention.'
+  },
+  stack_overflow: {
+    label: 'Stack Overflow',
+    systemPrompt: 'You are Meow AI — a senior developer. Cut through the noise. Summarize the real answer, highlight caveats, detect bugs in solutions, mention alternatives.'
+  },
+  article: {
+    label: 'Article',
+    systemPrompt: 'You are Meow AI — a technical curator. Provide: KEY POINTS, CRITICAL ANALYSIS, ACTIONABLE TAKEAWAYS, WHY THIS MATTERS. Be analytical, not generic.'
+  },
+  documentation: {
+    label: 'Documentation',
+    systemPrompt: 'You are Meow AI — a documentation expert. Summarize the API/feature, highlight gotchas, provide quick-start guidance, suggest edge cases to test.'
+  },
+  research_paper: {
+    label: 'Research Paper',
+    systemPrompt: 'You are Meow AI — a research analyst. Provide: SUMMARY, METHODOLOGY, KEY FINDINGS, PRACTICAL IMPLICATIONS. Explain in plain language.'
   },
   general_analysis: {
     label: 'General Analysis',
-    systemPrompt: 'You are Meow AI - a senior technical analyst. Provide: SUMMARY, KEY INSIGHT, PRACTICAL VALUE. Be clear and actionable.'
+    systemPrompt: 'You are Meow AI — a senior technical analyst. Provide: SUMMARY, KEY TECH INSIGHT, WHY THIS MATTERS, POTENTIAL RISKS, SUGGESTED NEXT STEP. Be clear and actionable.'
   }
 };
 
@@ -39,11 +55,26 @@ const MODES = {
 
 function detectMode(url) {
   const u = (url || '').toLowerCase();
-  if (u.includes('github.com') && u.includes('/pull')) return 'pr_review';
-  if (u.includes('github.com')) return 'github_analysis';
-  if (u.includes('linkedin.com/jobs')) return 'job_analysis';
-  if (u.includes('leetcode.com')) return 'dsa_problem';
-  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'learning_mode';
+  if ((u.includes('github.com') && u.includes('/pull')) ||
+      (u.includes('gitlab.com') && u.includes('/merge_requests'))) return 'pr_review';
+  if (u.includes('github.com') || u.includes('gitlab.com')) return 'github_analysis';
+  if (u.includes('linkedin.com/jobs') || u.includes('linkedin.com/in/') ||
+      u.includes('indeed.com') || u.includes('glassdoor.com')) return 'job_analysis';
+  if (u.includes('leetcode.com') || u.includes('hackerrank.com') ||
+      u.includes('codechef.com') || u.includes('codeforces.com') ||
+      u.includes('geeksforgeeks.org/problems') || u.includes('neetcode.io')) return 'dsa_problem';
+  if (u.includes('youtube.com') || u.includes('youtu.be') ||
+      u.includes('udemy.com') || u.includes('coursera.org')) return 'learning_mode';
+  if (u.includes('stackoverflow.com') || u.includes('stackexchange.com') ||
+      u.includes('superuser.com') || u.includes('serverfault.com')) return 'stack_overflow';
+  if (u.includes('arxiv.org') || u.includes('scholar.google') ||
+      u.includes('semanticscholar.org') || u.includes('openreview.net')) return 'research_paper';
+  if (u.includes('docs.') || u.includes('documentation') ||
+      u.includes('developer.mozilla.org') || u.includes('devdocs.io') ||
+      u.includes('learn.microsoft.com')) return 'documentation';
+  if (u.includes('medium.com') || u.includes('dev.to') ||
+      u.includes('hashnode.') || u.includes('freecodecamp.org') ||
+      u.includes('hackernoon.com') || u.includes('news.ycombinator.com')) return 'article';
   return 'general_analysis';
 }
 
@@ -131,27 +162,68 @@ function showSettingsScreen() {
 // ==================== PAGE CONTENT ====================
 
 async function getPageContent(tabId) {
-  return new Promise((resolve, reject) => {
-    try {
-      chrome.tabs.sendMessage(tabId, { action: 'getPageContent' }, (response) => {
+  // Strategy 1: Try content script message (fast, rich extraction)
+  try {
+    const response = await new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(tabId, { action: 'getPageContent' }, (resp) => {
         if (chrome.runtime.lastError) {
-          reject(new Error('Page not ready. Please refresh and try again.'));
+          reject(chrome.runtime.lastError);
           return;
         }
-        if (!response) {
-          reject(new Error('No response from page. Please refresh.'));
-          return;
-        }
-        if (response.success) {
-          resolve(response.data);
-        } else {
-          reject(new Error(response.error || 'Failed to extract content'));
-        }
+        resolve(resp);
       });
-    } catch (error) {
-      reject(new Error('Communication error: ' + error.message));
+    });
+
+    if (response?.success && response.data) {
+      return response.data;
     }
-  });
+  } catch (_ignored) {
+    // Content script not injected yet — fall through to fallback
+  }
+
+  // Strategy 2: Direct extraction via scripting API (works even without content scripts)
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const title = document.title || '';
+        const url = window.location.href;
+
+        // Smart text extraction — skip nav, footer, ads
+        const selectors = ['main', 'article', '[role="main"]', '.content', '#content', '.post-body'];
+        let mainEl = null;
+        for (const sel of selectors) {
+          mainEl = document.querySelector(sel);
+          if (mainEl) break;
+        }
+        const source = mainEl || document.body;
+        const textContent = (source?.innerText || '').substring(0, 5000);
+
+        // Grab code blocks if present
+        const codeBlocks = [];
+        document.querySelectorAll('pre code, .highlight code, .CodeMirror-code').forEach(block => {
+          if (block.textContent.trim().length > 10) {
+            codeBlocks.push(block.textContent.trim().substring(0, 1000));
+          }
+        });
+
+        return {
+          title,
+          textContent: textContent + (codeBlocks.length ? '\n\n[Code]:\n' + codeBlocks.join('\n---\n') : ''),
+          url,
+          mode: 'General Analysis'
+        };
+      }
+    });
+
+    if (results?.[0]?.result) {
+      return results[0].result;
+    }
+  } catch (scriptError) {
+    console.error('Meow AI scripting fallback failed:', scriptError);
+  }
+
+  throw new Error('Cannot access this page. Try refreshing or navigating to it again.');
 }
 
 // ==================== BACKEND API ====================
