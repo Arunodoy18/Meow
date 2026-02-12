@@ -96,15 +96,13 @@ Select: **English (United States)**
 
 ### **Homepage URL**
 ```
-https://github.com/[YOUR_USERNAME]/meow-ai
+https://github.com/Arunodoy18/Meow
 ```
-(Update with your actual GitHub repo URL)
 
 ### **Support URL**
 ```
-https://github.com/[YOUR_USERNAME]/meow-ai/issues
+https://github.com/Arunodoy18/Meow/issues
 ```
-(Update with your actual GitHub repo URL)
 
 ---
 
