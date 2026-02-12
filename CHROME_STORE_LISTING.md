@@ -127,7 +127,7 @@ https://github.com/Arunodoy18/Meow/issues
 - [ ] Marquee promo tile uploaded (marquee-promo-1400x560.jpg) - Optional but recommended
 - [ ] Homepage URL added
 - [ ] Support URL added
-- [ ] Privacy policy filled (on Privacy tab)
+- [ ] **Privacy policy filled** - See [CHROME_STORE_PRIVACY_GUIDE.md](CHROME_STORE_PRIVACY_GUIDE.md) for complete details
 - [ ] Save draft
 - [ ] Submit for review
 
