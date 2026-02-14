@@ -4,7 +4,7 @@
 
 **Single purpose description** (Required - 0/1,000 characters)
 ```
-Meow AI provides AI-powered assistance for developers while browsing technical websites. It analyzes webpage content to offer context-aware insights, code reviews, problem-solving guidance, and intelligent explanations across GitHub, LeetCode, Stack Overflow, documentation sites, and other technical platforms.
+Meow AI provides AI-powered assistance for developers while browsing technical websites. It analyzes webpage content to offer context-aware insights, code reviews, problem-solving guidance, and intelligent explanations across code repositories, programming challenge platforms, developer forums, documentation sites, and other technical resources.
 ```
 
 ---
@@ -28,7 +28,7 @@ The storage permission is used to save user preferences (such as chat panel posi
 
 ### **Host permission justification** (Required - 0/1,000 characters)
 ```
-The <all_urls> host permission enables the extension to work universally across all technical websites (GitHub, GitLab, LeetCode, Stack Overflow, documentation sites, etc.). Since developers work across hundreds of different domains, this broad permission is essential to provide consistent AI assistance regardless of which technical platform they're using. The extension only activates when users explicitly trigger it.
+The <all_urls> host permission enables the extension to work universally across all technical websites, including code repositories, programming platforms, developer forums, documentation sites, and learning resources. Since developers work across hundreds of different domains daily, this broad permission is essential to provide consistent AI assistance regardless of which technical platform they're using. The extension only activates when users explicitly trigger it and does not run automatically in the background.
 ```
 
 ⚠️ **Warning**: Host permission `<all_urls>` may require in-depth review and delay publishing.

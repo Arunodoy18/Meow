@@ -4,54 +4,51 @@
 
 ### **Description** (0/16,000 characters)
 ```
-🐱 Meow AI is your universal AI developer copilot that works everywhere — GitHub, LeetCode, Stack Overflow, LinkedIn, YouTube, documentation sites, and more. Zero setup required.
+🐱 Meow AI is your universal AI developer copilot that works across all technical websites. Zero setup required — just install and start using.
 
-✨ UNIVERSAL CONTEXT DETECTION
-Meow AI automatically detects what you're viewing and adapts:
+✨ CONTEXT-AWARE INTELLIGENCE
+Meow AI automatically detects what you're viewing and provides relevant assistance:
 
-• GitHub/GitLab PRs → Senior-level code review with merge recommendations
-• GitHub repos & issues → Architecture analysis, issue explanation, solution paths
-• LeetCode/HackerRank/CodeChef/Codeforces → Hint-first DSA tutoring with complexity analysis
-• Stack Overflow → Cuts through noise, highlights real answers & caveats
-• LinkedIn/Indeed/Glassdoor → Career intelligence, skill gap analysis, prep strategy
-• YouTube/Udemy/Coursera → Key concept reinforcement, practical takeaways
-• Medium/Dev.to/Hashnode/HN → Critical analysis, actionable insights
-• MDN/DevDocs/official docs → Quick-start guidance, gotchas, edge cases
-• arXiv/Google Scholar → Plain-language research paper breakdowns
-• Any technical page → Smart structured analysis
+• Code repositories → Senior-level code review and architecture analysis
+• Programming problems → Hint-first tutoring with complexity guidance
+• Q&A forums → Clear answers with practical insights
+• Job listings → Career intelligence and skill gap analysis
+• Video tutorials → Key concept reinforcement and takeaways
+• Technical blogs → Critical analysis with actionable insights
+• API documentation → Quick-start guidance with gotchas and edge cases
+• Research papers → Plain-language explanations of complex topics
 
-💬 SIDE CHAT PANEL
-• Click the 🐱 button on any webpage to open AI chat
-• Multi-turn conversation with memory
-• Streaming responses with natural typing
-• Quick actions: Explain, Summarize, Help
+💬 INTERACTIVE SIDE PANEL
+• Click the 🐱 icon or press Alt+M to open the chat panel
+• Multi-turn conversations with context memory
+• Real-time streaming responses
+• Works on any webpage without leaving your current tab
 
-🧠 SMART RESPONSE STRUCTURE
-Every response includes:
-• Summary — What this is about
-• Key Tech Insight — The core takeaway
-• Why This Matters — Real-world significance
-• Potential Risks — What could go wrong
-• Suggested Next Step — Actionable follow-up
+🧠 STRUCTURED RESPONSES
+Every AI response includes:
+• Summary of the content
+• Key technical insights
+• Real-world significance
+• Potential risks and considerations
+• Actionable next steps
 
-🎓 HINT-FIRST LEARNING
-For DSA problems, Meow AI gives direction first — full solutions only when you explicitly ask.
+🎓 LEARNING-FOCUSED APPROACH
+When helping with coding problems, Meow AI provides hints and guidance first, giving full solutions only when explicitly requested. This approach helps you learn and understand rather than just copy code.
 
-🔐 ZERO SETUP & PRIVACY
-• No API keys needed from users
-• Backend proxy via Cloudflare Workers
-• No data stored or tracked
-• Open source & transparent
+🔐 PRIVACY & SECURITY
+• No API keys required from users
+• Secure backend processing via Cloudflare Workers
+• No data storage or tracking
+• No analytics or telemetry
+• Open source and transparent
 
 🚀 GETTING STARTED
 1. Install the extension
-2. Visit any technical webpage
-3. Click the 🐱 icon or press Alt+M
-4. Start chatting!
+2. Visit any technical webpage (code repositories, problem sites, documentation, forums, etc.)
+3. Click the Meow AI icon in your toolbar or press Alt+M
+4. Ask questions or use quick actions to analyze the page
 
-Works on: GitHub, GitLab, LeetCode, HackerRank, CodeChef, Codeforces, Stack Overflow, Stack Exchange, LinkedIn, Indeed, Glassdoor, YouTube, Udemy, Coursera, Medium, Dev.to, Hashnode, Hacker News, MDN, DevDocs, arXiv, Google Scholar, and all documentation sites.
-
-Perfect for developers, students, tech learners, open-source contributors, technical professionals, and anyone navigating the technical web.
+Perfect for software developers, students learning to code, open-source contributors, and technical professionals who need AI assistance while browsing.
 ```
 
 ### **Category**
