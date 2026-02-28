@@ -250,16 +250,28 @@
         MeowChatUI.togglePanel();
       }
 
-      // ALT + E → explain page
+      // ALT + E → explain page (YouTube-aware)
       if (e.altKey && (e.key === 'e' || e.key === 'E') && MeowChatUI.isPanelOpen()) {
         e.preventDefault();
-        handleSendMessage('Explain this page in detail');
+        if (_lastMode === 'YouTube') {
+          handleSendMessage('Give me a quick summary of this video — what\'s it about, key takeaways, and is it worth watching?');
+        } else if (_lastMode === 'GitHub Issue') {
+          handleSendMessage('Explain this issue in simple terms — what\'s going wrong and why?');
+        } else {
+          handleSendMessage('Explain this page in detail');
+        }
       }
 
-      // ALT + S → summarize
+      // ALT + S → summarize (mode-aware)
       if (e.altKey && (e.key === 's' || e.key === 'S') && MeowChatUI.isPanelOpen()) {
         e.preventDefault();
-        handleSendMessage('Summarize the key points from this page');
+        if (_lastMode === 'YouTube') {
+          handleSendMessage('What are the most important things I should remember from this video?');
+        } else if (_lastMode === 'GitHub Issue') {
+          handleSendMessage('How would you approach fixing this issue? Give me a step-by-step solution path.');
+        } else {
+          handleSendMessage('Summarize the key points from this page');
+        }
       }
 
       // ALT + R → review code

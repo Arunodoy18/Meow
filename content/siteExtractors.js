@@ -187,49 +187,236 @@ const MeowSiteExtractors = (() => {
     }
   }
 
-  // ==================== YOUTUBE EXTRACTOR ====================
+  // ==================== YOUTUBE EXTRACTOR (Enhanced) ====================
 
   function _extractYouTube() {
     try {
       const data = { type: 'youtube' };
 
-      // Video title
+      // ── Rich metadata from <meta> tags & LD+JSON ──
+      const metaTitle = document.querySelector('meta[property="og:title"]')?.content ||
+                        document.querySelector('meta[name="title"]')?.content;
+      const metaChannel = document.querySelector('link[itemprop="name"]')?.content ||
+                          document.querySelector('span[itemprop="author"] link[itemprop="name"]')?.content;
+      const metaDuration = document.querySelector('meta[itemprop="duration"]')?.content; // e.g. "PT12M34S"
+      const metaPublished = document.querySelector('meta[itemprop="datePublished"]')?.content ||
+                            document.querySelector('meta[itemprop="uploadDate"]')?.content;
+      const metaInteraction = document.querySelector('meta[itemprop="interactionCount"]')?.content;
+      const metaGenre = document.querySelector('meta[itemprop="genre"]')?.content;
+      const metaDescription = document.querySelector('meta[property="og:description"]')?.content ||
+                              document.querySelector('meta[name="description"]')?.content;
+      const metaKeywords = document.querySelector('meta[name="keywords"]')?.content;
+
+      // Try LD+JSON for even richer data
+      let ldData = null;
+      try {
+        const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+        for (const s of ldScripts) {
+          const parsed = JSON.parse(s.textContent);
+          if (parsed['@type'] === 'VideoObject' || parsed?.['@graph']?.find(g => g['@type'] === 'VideoObject')) {
+            ldData = parsed['@type'] === 'VideoObject' ? parsed : parsed['@graph'].find(g => g['@type'] === 'VideoObject');
+            break;
+          }
+        }
+      } catch (_) { /* LD+JSON parse is best-effort */ }
+
+      // ── Video title ──
       data.title = document.querySelector('h1.ytd-watch-metadata yt-formatted-string, #title h1')?.textContent?.trim() ||
-                   document.querySelector('meta[name="title"]')?.content ||
-                   document.title;
+                   metaTitle || ldData?.name || document.title;
 
-      // Channel
-      data.channel = document.querySelector('#channel-name a, ytd-channel-name a')?.textContent?.trim() || '';
+      // ── Channel ──
+      data.channel = document.querySelector('#channel-name a, ytd-channel-name a')?.textContent?.trim() ||
+                     metaChannel || ldData?.author?.name || '';
 
-      // Description
-      const descEl = document.querySelector('#description-inline-expander .content, #description ytd-text-inline-expander span');
-      data.description = descEl?.innerText?.trim()?.substring(0, 2000) || '';
+      // ── Subscriber count (visible on page) ──
+      data.subscribers = document.querySelector('#owner-sub-count, yt-formatted-string#owner-sub-count')?.textContent?.trim() || '';
 
-      // Video metadata
+      // ── Description (DOM first, then meta) ──
+      const descEl = document.querySelector('#description-inline-expander .content, #description ytd-text-inline-expander span, #description .content');
+      data.description = descEl?.innerText?.trim()?.substring(0, 2500) || metaDescription || ldData?.description?.substring(0, 2500) || '';
+
+      // ── Video stats ──
       const viewCount = document.querySelector('.view-count, ytd-video-view-count-renderer span');
-      data.views = viewCount?.textContent?.trim() || '';
+      data.views = viewCount?.textContent?.trim() || (metaInteraction ? metaInteraction + ' views' : '') || '';
 
-      // Chapters (if available)
+      // Like count
+      const likeBtn = document.querySelector('ytd-menu-renderer button[aria-label*="like" i], like-button-renderer #text, ytd-toggle-button-renderer:first-of-type #text');
+      data.likes = likeBtn?.textContent?.trim() || likeBtn?.getAttribute('aria-label')?.match(/[\d,.]+/)?.[0] || '';
+
+      // Duration — parse ISO 8601 (PT12M34S → 12:34)
+      const rawDuration = metaDuration || ldData?.duration || '';
+      if (rawDuration) {
+        const dm = rawDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (dm) {
+          const h = dm[1] ? dm[1] + ':' : '';
+          const m = (dm[2] || '0').padStart(h ? 2 : 1, '0');
+          const s = (dm[3] || '0').padStart(2, '0');
+          data.duration = h + m + ':' + s;
+        } else {
+          data.duration = rawDuration;
+        }
+      } else {
+        // Fallback: try the time display on the player
+        data.duration = document.querySelector('.ytp-time-duration')?.textContent?.trim() || '';
+      }
+
+      // Published date
+      data.published = metaPublished || ldData?.uploadDate || '';
+      if (!data.published) {
+        const dateEl = document.querySelector('#info-strings yt-formatted-string, .date.yt-formatted-string');
+        data.published = dateEl?.textContent?.trim() || '';
+      }
+
+      // Genre / category
+      data.genre = metaGenre || ldData?.genre || '';
+
+      // Keywords / tags
+      data.keywords = metaKeywords || '';
+
+      // ── Chapters (if available) ──
       const chapters = document.querySelectorAll('ytd-macro-markers-list-item-renderer');
-      data.chapters = Array.from(chapters).slice(0, 20).map(ch => {
+      data.chapters = Array.from(chapters).slice(0, 25).map(ch => {
         const time = ch.querySelector('#time')?.textContent?.trim();
         const title = ch.querySelector('#details h4')?.textContent?.trim();
         return time && title ? `${time} - ${title}` : '';
       }).filter(Boolean);
 
-      // Transcript (if panel is open)
+      // ── Transcript (if panel is open) ──
       const transcriptSegments = document.querySelectorAll('ytd-transcript-segment-renderer');
       data.transcript = Array.from(transcriptSegments).map(seg => {
         const time = seg.querySelector('.segment-timestamp')?.textContent?.trim();
         const text = seg.querySelector('.segment-text')?.textContent?.trim();
         return time && text ? `[${time}] ${text}` : text || '';
-      }).filter(Boolean).join(' ').substring(0, 4000);
+      }).filter(Boolean).join(' ').substring(0, 5000);
 
-      // Comments (top few)
+      // ── Comments (top few) ──
       const comments = document.querySelectorAll('#content-text');
-      data.topComments = Array.from(comments).slice(0, 5).map(el => el.textContent.trim().substring(0, 200));
+      data.topComments = Array.from(comments).slice(0, 5).map(el => el.textContent.trim().substring(0, 250));
 
-      return _formatExtraction(data, `YouTube Video: ${data.title}\nChannel: ${data.channel}\nViews: ${data.views}\n\nDescription:\n${data.description}\n\nChapters:\n${data.chapters.join('\n') || 'No chapters'}\n\nTranscript:\n${data.transcript || 'Transcript not available (not expanded)'}\n\nTop Comments:\n${data.topComments.join('\n---\n') || 'No comments loaded'}`);
+      // ── Video ID from URL ──
+      const vidMatch = window.location.href.match(/[?&]v=([^&]+)/);
+      data.videoId = vidMatch?.[1] || '';
+
+      // ── Build rich formatted output ──
+      const metaLine = [
+        data.views && `Views: ${data.views}`,
+        data.likes && `Likes: ${data.likes}`,
+        data.duration && `Duration: ${data.duration}`,
+        data.published && `Published: ${data.published}`,
+        data.genre && `Category: ${data.genre}`,
+        data.subscribers && `Channel Subscribers: ${data.subscribers}`
+      ].filter(Boolean).join(' | ');
+
+      const formatted = [
+        `🎬 NOW PLAYING: "${data.title}"`,
+        `Channel: ${data.channel}`,
+        metaLine,
+        data.videoId && `Video ID: ${data.videoId}`,
+        '',
+        'Description:',
+        data.description,
+        '',
+        data.keywords && `Tags: ${data.keywords}`,
+        '',
+        data.chapters.length ? `Chapters (${data.chapters.length}):` : '',
+        data.chapters.join('\n') || '',
+        '',
+        data.transcript ? `Transcript (available):` : 'Transcript: Not expanded — click "Show transcript" on the video for full transcript',
+        data.transcript || '',
+        '',
+        data.topComments.length ? `Top Comments:` : 'Comments: Not loaded yet',
+        data.topComments.join('\n---\n') || ''
+      ].filter(line => line !== undefined).join('\n');
+
+      return _formatExtraction(data, formatted);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ==================== GITHUB ISSUE EXTRACTOR ====================
+
+  function _extractGitHubIssue() {
+    try {
+      const data = { type: 'github_issue' };
+
+      // Issue title
+      data.title = document.querySelector('.js-issue-title, .gh-header-title .markdown-title')?.textContent?.trim() || document.title;
+
+      // Issue number
+      const numEl = document.querySelector('.gh-header-number');
+      data.number = numEl?.textContent?.trim() || '';
+
+      // Issue state (open/closed)
+      const stateEl = document.querySelector('.State, [title="Status: Open"], [title="Status: Closed"]');
+      data.state = stateEl?.textContent?.trim() || '';
+
+      // Issue body
+      const bodyEl = document.querySelector('.comment-body.markdown-body');
+      data.body = bodyEl?.innerText?.trim()?.substring(0, 3500) || '';
+
+      // Labels
+      const labels = document.querySelectorAll('.js-issue-labels .IssueLabel, .sidebar-labels .IssueLabel');
+      data.labels = Array.from(labels).map(el => el.textContent.trim());
+
+      // Assignees
+      const assignees = document.querySelectorAll('.css-truncate.assignee .avatar, .assignee .d-table');
+      data.assignees = Array.from(assignees).map(el => el.getAttribute('alt')?.replace('@', '') || el.textContent.trim()).filter(Boolean);
+
+      // Milestone
+      data.milestone = document.querySelector('.milestone-name, [data-card-field="Milestone"]')?.textContent?.trim() || '';
+
+      // Author
+      data.author = document.querySelector('.author.text-bold, .timeline-comment-header .author')?.textContent?.trim() || '';
+
+      // Timestamp
+      data.created = document.querySelector('relative-time')?.getAttribute('datetime') || '';
+
+      // Linked PRs
+      const linkedPRs = document.querySelectorAll('.my-1 a[data-hovercard-type="pull_request"]');
+      data.linkedPRs = Array.from(linkedPRs).map(el => el.textContent.trim());
+
+      // Comments / discussion
+      const commentBodies = document.querySelectorAll('.timeline-comment .comment-body');
+      data.comments = Array.from(commentBodies).slice(0, 10).map((el, i) => {
+        const authorEl = el.closest('.timeline-comment')?.querySelector('.author');
+        const author = authorEl?.textContent?.trim() || `Comment ${i + 1}`;
+        return `${author}: ${el.innerText.trim().substring(0, 400)}`;
+      });
+
+      // Error / stack trace detection (common in issues)
+      const codeBlocks = data.body.match(/```[\s\S]*?```/g) || [];
+      const hasStackTrace = data.body.toLowerCase().includes('stack trace') ||
+                           data.body.toLowerCase().includes('traceback') ||
+                           data.body.toLowerCase().includes('error:') ||
+                           data.body.toLowerCase().includes('exception');
+      data.hasStackTrace = hasStackTrace;
+
+      // Steps to reproduce detection
+      const hasSteps = data.body.toLowerCase().includes('steps to reproduce') ||
+                       data.body.toLowerCase().includes('how to reproduce') ||
+                       data.body.toLowerCase().includes('reproduction');
+      data.hasReproSteps = hasSteps;
+
+      const formatted = [
+        `GitHub Issue ${data.number}: ${data.title}`,
+        `State: ${data.state} | Author: ${data.author} | Created: ${data.created}`,
+        data.labels.length ? `Labels: ${data.labels.join(', ')}` : '',
+        data.milestone ? `Milestone: ${data.milestone}` : '',
+        data.assignees.length ? `Assignees: ${data.assignees.join(', ')}` : '',
+        data.linkedPRs.length ? `Linked PRs: ${data.linkedPRs.join(', ')}` : '',
+        '',
+        'Issue Description:',
+        data.body,
+        '',
+        data.hasStackTrace ? '⚠ Contains error/stack trace — debugging context available' : '',
+        data.hasReproSteps ? '📋 Contains reproduction steps' : '',
+        '',
+        data.comments.length ? `Discussion (${data.comments.length} comments):` : 'No comments yet',
+        data.comments.join('\n---\n')
+      ].filter(line => line !== undefined).join('\n');
+
+      return _formatExtraction(data, formatted);
     } catch (e) {
       return null;
     }
@@ -395,6 +582,11 @@ const MeowSiteExtractors = (() => {
         return _extractGitHubPR();
       }
 
+      // GitHub Issue
+      if (u.includes('github.com') && u.includes('/issues/')) {
+        return _extractGitHubIssue();
+      }
+
       // GitHub Repo
       if (u.includes('github.com') && !u.includes('/pull') && !u.includes('/issues/')) {
         return _extractGitHubRepo();
@@ -411,7 +603,7 @@ const MeowSiteExtractors = (() => {
       }
 
       // YouTube
-      if (u.includes('youtube.com/watch') || u.includes('youtu.be/')) {
+      if (u.includes('youtube.com/watch') || u.includes('youtu.be/') || u.includes('youtube.com/shorts/')) {
         return _extractYouTube();
       }
 

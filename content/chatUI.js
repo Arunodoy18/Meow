@@ -984,14 +984,12 @@ const MeowChatUI = (() => {
           <div class="meow-welcome-icon">🐱</div>
           <div class="meow-welcome-title">Hey! I'm Meow AI</div>
           <div class="meow-welcome-text">
-            Your elite developer copilot.<br>
-            Mode: <strong>${mode}</strong>
+            ${_getWelcomeTextForMode(mode)}
           </div>
           <div class="meow-quick-actions">
-            <button class="meow-quick-btn" data-action="explain">📄 Explain this page</button>
-            <button class="meow-quick-btn" data-action="summarize">✨ Summarize key points</button>
-            <button class="meow-quick-btn" data-action="review">🔍 Review this code</button>
-            <button class="meow-quick-btn" data-action="help">💡 What can you do?</button>
+            ${_getQuickActionsForMode(mode).map(a =>
+              `<button class="meow-quick-btn" data-action="custom" data-message="${_escAttr(a.message)}">${a.icon} ${a.label}</button>`
+            ).join('\n            ')}
           </div>
         </div>
       </div>
@@ -1145,22 +1143,8 @@ const MeowChatUI = (() => {
       }, DEBOUNCE_MS);
     });
 
-    // Quick action buttons
-    _panel.querySelectorAll('.meow-quick-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const actions = {
-          explain: 'Explain this page in detail',
-          summarize: 'Give me the key insights from this page',
-          review: 'Review this code — highlight issues and improvements',
-          help: 'What can you help me with?'
-        };
-        const msg = actions[btn.dataset.action];
-        if (msg) {
-          textarea.value = msg;
-          _handleSend();
-        }
-      });
-    });
+    // Quick action buttons (mode-aware)
+    _wireQuickActionButtons();
 
     // Offline detection
     const banner = _panel.querySelector('.meow-offline-banner');
@@ -1425,9 +1409,137 @@ const MeowChatUI = (() => {
     if (sendBtn) sendBtn.disabled = !enabled;
   }
 
+  // ==================== MODE-AWARE QUICK ACTIONS ====================
+
+  function _escAttr(str) {
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;');
+  }
+
+  function _getWelcomeTextForMode(mode) {
+    const welcomes = {
+      'YouTube': 'I can see what video you\'re watching.<br>Ask me to <strong>summarize</strong>, explain <strong>key takeaways</strong>, or anything about it!',
+      'GitHub Issue': 'I see this issue. Ask me to <strong>explain it</strong>,<br>suggest <strong>how to fix it</strong>, or do a <strong>root cause analysis</strong>.',
+      'PR Review': 'Ready to review this PR.<br>I\'ll check for bugs, suggest improvements, and give you my <strong>honest take</strong>.',
+      'GitHub Analysis': 'I can see this repo.<br>Ask about <strong>architecture</strong>, how to <strong>contribute</strong>, or anything you need.',
+      'Article': 'I\'ve read this article with you.<br>Want a <strong>summary</strong>, <strong>critical analysis</strong>, or <strong>actionable takeaways</strong>?',
+      'Stack Overflow': 'Let me cut through the noise.<br>I\'ll find the <strong>real answer</strong> and flag any <strong>gotchas</strong>.',
+      'DSA Problem': 'I see this problem. Want <strong>hints</strong> first,<br>or should I help you <strong>identify the pattern</strong>?',
+      'Learning Mode': 'Your learning copilot is here.<br>I\'ll help you <strong>understand concepts</strong> and <strong>apply them</strong>.',
+      'Documentation': 'I\'ll translate these docs for you.<br><strong>Quick start</strong>, <strong>gotchas</strong>, and <strong>examples</strong> — just ask.',
+      'Research Paper': 'I\'ll break down this paper for you.<br><strong>Plain English summary</strong> and <strong>practical implications</strong>.',
+      'Job Analysis': 'Let me analyze this job posting.<br><strong>Red flags</strong>, <strong>skill gaps</strong>, and <strong>interview prep</strong> ready.',
+      'General Analysis': 'Your sharp developer copilot.<br>Mode: <strong>' + 'General Analysis' + '</strong>'
+    };
+    return welcomes[mode] || `Your sharp developer copilot.<br>Mode: <strong>${mode}</strong>`;
+  }
+
+  function _getQuickActionsForMode(mode) {
+    const modeActions = {
+      'YouTube': [
+        { icon: '📺', label: 'Summarize this video', message: 'Give me a quick summary of this video — what\'s it about, key takeaways, and is it worth watching?' },
+        { icon: '🎯', label: 'Key takeaways', message: 'What are the most important things I should remember from this video?' },
+        { icon: '💡', label: 'What can I learn?', message: 'What skills or knowledge can I gain from this video? What should I learn next?' },
+        { icon: '📝', label: 'Explain like a friend', message: 'Explain what this video covers like you\'re telling a friend about it' }
+      ],
+      'GitHub Issue': [
+        { icon: '🐛', label: 'Explain this issue', message: 'Explain this issue in simple terms — what\'s going wrong and why?' },
+        { icon: '🔧', label: 'How to solve this', message: 'How would you approach fixing this issue? Give me a step-by-step solution path.' },
+        { icon: '⚡', label: 'Quick workaround', message: 'Is there a quick workaround for this issue while a proper fix is built?' },
+        { icon: '🔍', label: 'Root cause analysis', message: 'What\'s the root cause of this issue? Break down the stack trace or error if available.' }
+      ],
+      'PR Review': [
+        { icon: '🔍', label: 'Review this PR', message: 'Review this pull request — what looks good, what concerns you, and should it be merged?' },
+        { icon: '🐛', label: 'Find bugs', message: 'Look for potential bugs, edge cases, or issues in this PR\'s code changes.' },
+        { icon: '✨', label: 'Suggest improvements', message: 'What improvements would you suggest for this PR?' },
+        { icon: '📋', label: 'Summarize changes', message: 'Give me a quick summary of what this PR actually changes and why.' }
+      ],
+      'GitHub Analysis': [
+        { icon: '🏗️', label: 'Explain architecture', message: 'Explain this repository\'s architecture and how it\'s structured.' },
+        { icon: '📄', label: 'Summarize this repo', message: 'What does this project do? Give me the quick rundown.' },
+        { icon: '🚀', label: 'How to contribute', message: 'How would I get started contributing to this project?' },
+        { icon: '💡', label: 'What can you do?', message: 'What can you help me with on this page?' }
+      ],
+      'Article': [
+        { icon: '📝', label: 'Summarize article', message: 'Summarize this article — what\'s the core idea and what should I take away from it?' },
+        { icon: '🔍', label: 'Critical analysis', message: 'Give me a critical analysis — what\'s good, what\'s missing, and do you agree with the author?' },
+        { icon: '🎯', label: 'Actionable takeaways', message: 'What are the practical, actionable things I can do based on this article?' },
+        { icon: '💡', label: 'ELI5 version', message: 'Explain this article\'s main points like I\'m five — simple and clear.' }
+      ],
+      'Stack Overflow': [
+        { icon: '✅', label: 'What\'s the answer?', message: 'Cut through the noise — what actually solves this problem?' },
+        { icon: '🔧', label: 'How to fix this', message: 'How do I fix this issue? Give me the solution with context.' },
+        { icon: '⚠️', label: 'Check for gotchas', message: 'Are there any gotchas, outdated answers, or edge cases the top answers miss?' },
+        { icon: '🔍', label: 'Explain the problem', message: 'Explain what\'s actually going wrong here and why it happens.' }
+      ],
+      'DSA Problem': [
+        { icon: '💭', label: 'Give me a hint', message: 'Give me a hint to solve this problem — don\'t spoil the solution!' },
+        { icon: '🧠', label: 'What pattern is this?', message: 'What algorithm pattern does this problem use? Help me recognize it.' },
+        { icon: '📊', label: 'Explain approach', message: 'Walk me through the approach step by step — help me understand the thinking.' },
+        { icon: '⚡', label: 'Optimize my solution', message: 'How can I optimize the solution for better time/space complexity?' }
+      ],
+      'Learning Mode': [
+        { icon: '📚', label: 'Explain this', message: 'Explain the content on this page — what should I learn from it?' },
+        { icon: '🎯', label: 'Key concepts', message: 'What are the key concepts I need to understand here?' },
+        { icon: '🛠️', label: 'Practical application', message: 'How can I apply what I\'m learning here in a real project?' },
+        { icon: '📍', label: 'What to learn next', message: 'Based on this content, what should I learn next to grow my skills?' }
+      ],
+      'Documentation': [
+        { icon: '🚀', label: 'Quick start guide', message: 'Give me a quick-start guide based on this documentation.' },
+        { icon: '⚠️', label: 'Gotchas & tips', message: 'What are the gotchas and practical tips from this documentation?' },
+        { icon: '💻', label: 'Show me examples', message: 'Give me practical code examples based on this documentation.' },
+        { icon: '📄', label: 'Summarize the API', message: 'Summarize this API/feature — what it does and when to use it.' }
+      ],
+      'Research Paper': [
+        { icon: '📄', label: 'Summarize paper', message: 'Summarize this research paper in plain English — what did they find and why does it matter?' },
+        { icon: '🔬', label: 'Explain methodology', message: 'Break down the methodology — how did they arrive at their conclusions?' },
+        { icon: '💡', label: 'Practical implications', message: 'What are the practical implications of this research? How could it be applied?' },
+        { icon: '🤔', label: 'Limitations & critique', message: 'What are the limitations of this paper? What should I be skeptical about?' }
+      ],
+      'Job Analysis': [
+        { icon: '📋', label: 'Analyze this job', message: 'Break down this job listing — what do they actually want and is it worth applying?' },
+        { icon: '🎯', label: 'Skills to highlight', message: 'What skills should I highlight from my experience for this role?' },
+        { icon: '🚩', label: 'Red/green flags', message: 'What are the red flags and green flags in this job listing?' },
+        { icon: '📝', label: 'Interview prep', message: 'How should I prepare for an interview for this role?' }
+      ]
+    };
+
+    return modeActions[mode] || [
+      { icon: '📄', label: 'Explain this page', message: 'Explain this page in detail — what\'s it about and what should I know?' },
+      { icon: '✨', label: 'Summarize key points', message: 'Give me the key insights from this page in a quick, digestible summary.' },
+      { icon: '🔍', label: 'Deep analysis', message: 'Do a deep analysis of this page — key tech insights, what matters, and what to watch out for.' },
+      { icon: '💡', label: 'What can you do?', message: 'What can you help me with?' }
+    ];
+  }
+
+  function _wireQuickActionButtons() {
+    if (!_panel) return;
+    _panel.querySelectorAll('.meow-quick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const msg = btn.dataset.message || btn.dataset.action;
+        if (msg && _onSendCallback) {
+          const textarea = _panel.querySelector('.meow-chat-textarea');
+          if (textarea) {
+            textarea.value = msg;
+          }
+          _handleSend();
+        }
+      });
+    });
+  }
+
   function updateMode(mode) {
     const modeEl = _panel?.querySelector('.meow-header-mode');
     if (modeEl) modeEl.textContent = mode;
+
+    // Update quick actions if welcome screen is still showing
+    const quickActionsEl = _panel?.querySelector('.meow-quick-actions');
+    if (quickActionsEl) {
+      const actions = _getQuickActionsForMode(mode);
+      quickActionsEl.innerHTML = actions.map(a =>
+        `<button class="meow-quick-btn" data-action="custom" data-message="${_escAttr(a.message)}">${a.icon} ${a.label}</button>`
+      ).join('');
+      _wireQuickActionButtons();
+    }
   }
 
   // ==================== CALLBACKS ====================
