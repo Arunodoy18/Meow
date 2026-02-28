@@ -7,14 +7,15 @@
 const MeowPageExtractor = (() => {
   'use strict';
 
-  const MAX_CONTENT_LENGTH = 8000;
+  const MAX_CONTENT_LENGTH = 12000;
   let _lastUrl = window.location.href;
   let _onNavigateCallbacks = [];
 
   // ==================== SMART CONTENT EXTRACTION ====================
 
   /**
-   * Extract clean page content with intelligent prioritization
+   * Extract clean page content with intelligent prioritization.
+   * Uses site-specific extractors when available for richer context.
    * @returns {Object} { title, url, textContent, mode }
    */
   function extractPageContent() {
@@ -23,22 +24,24 @@ const MeowPageExtractor = (() => {
       const url = window.location.href;
       const mode = detectPageMode(url);
 
-      // Clone body to avoid DOM modifications
-      const clone = document.body.cloneNode(true);
+      // Try site-specific extractor first (richer, structured output)
+      if (typeof MeowSiteExtractors !== 'undefined') {
+        try {
+          const siteContent = MeowSiteExtractors.extract(url, mode);
+          if (siteContent && siteContent.length > 100) {
+            return { title, url, textContent: siteContent, mode };
+          }
+        } catch (e) {
+          // Silently fall through to generic extraction
+        }
+      }
 
-      // Remove non-content elements
-      const removeTags = ['script', 'style', 'noscript', 'svg', 'iframe',
-        'nav', 'footer', 'header'];
-      removeTags.forEach(tag => {
-        clone.querySelectorAll(tag).forEach(el => el.remove());
-      });
-
-      // Remove hidden elements
-      clone.querySelectorAll('[aria-hidden="true"], [style*="display: none"], [style*="display:none"]')
-        .forEach(el => el.remove());
-
-      // Prioritize main content areas
+      // Fallback: generic extraction using safe text-only approach
+      // Use a DocumentFragment to avoid triggering SVG/attribute validation errors
+      // that occur when cloneNode copies invalid SVGs from third-party pages
       let contentText = '';
+
+      // Prioritize main content areas (read text directly, no cloning)
       const prioritySelectors = [
         'article', 'main', '[role="main"]',
         '.post-content', '.article-content', '.entry-content',
@@ -47,16 +50,46 @@ const MeowPageExtractor = (() => {
       ];
 
       for (const selector of prioritySelectors) {
-        const el = clone.querySelector(selector);
-        if (el && el.textContent.trim().length > 200) {
-          contentText = el.textContent;
+        const el = document.querySelector(selector);
+        if (el && el.innerText && el.innerText.trim().length > 200) {
+          contentText = el.innerText;
           break;
         }
       }
 
-      // Fall back to full body text
+      // Fall back to body text (read directly without cloning)
       if (!contentText) {
-        contentText = clone.textContent || '';
+        // Build text from top-level content nodes, skipping script/style/svg/nav/etc
+        const skipTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'SVG', 'IFRAME',
+          'NAV', 'FOOTER', 'HEADER', 'LINK', 'META']);
+        const parts = [];
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode(node) {
+              let parent = node.parentElement;
+              while (parent && parent !== document.body) {
+                if (skipTags.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+                const style = parent.getAttribute('style') || '';
+                if (style.includes('display: none') || style.includes('display:none')) {
+                  return NodeFilter.FILTER_REJECT;
+                }
+                if (parent.getAttribute('aria-hidden') === 'true') {
+                  return NodeFilter.FILTER_REJECT;
+                }
+                parent = parent.parentElement;
+              }
+              return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+            }
+          }
+        );
+
+        let node;
+        while ((node = walker.nextNode())) {
+          parts.push(node.textContent);
+        }
+        contentText = parts.join(' ');
       }
 
       // Clean whitespace

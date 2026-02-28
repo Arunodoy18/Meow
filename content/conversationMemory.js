@@ -48,6 +48,42 @@ const MeowConversationMemory = (() => {
     if (_history.length > MAX_HISTORY_SIZE) {
       _history.splice(0, _history.length - MAX_HISTORY_SIZE);
     }
+
+    // Auto-save to persistent storage
+    _persistHistory();
+  }
+
+  /**
+   * Persist history to chrome.storage for session recovery.
+   */
+  async function _persistHistory() {
+    try {
+      if (typeof MeowStorage !== 'undefined' && _pageContext?.url) {
+        await MeowStorage.saveChatHistory(_pageContext.url, _history);
+      }
+    } catch (e) {
+      // Silent fail — persistence is best-effort
+    }
+  }
+
+  /**
+   * Load persisted history from storage.
+   * @param {string} url - Page URL to load history for
+   * @returns {Promise<boolean>} Whether history was restored
+   */
+  async function loadPersistedHistory(url) {
+    try {
+      if (typeof MeowStorage === 'undefined') return false;
+      const saved = await MeowStorage.loadChatHistory(url);
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        _history = saved;
+        _turnCount = saved.length;
+        return true;
+      }
+    } catch (e) {
+      console.warn('🐱 Failed to load persisted history:', e);
+    }
+    return false;
   }
 
   /**
@@ -296,12 +332,24 @@ ${userMessage}`;
   // ==================== CLEANUP ====================
 
   /**
+   * Get the full conversation history (for export, UI replay, etc.).
+   * @returns {Array<{role: string, content: string, timestamp: number}>}
+   */
+  function getFullHistory() {
+    return [..._history];
+  }
+
+  /**
    * Clear all conversation history (e.g., on site change).
    */
   function clear() {
     _history = [];
     _turnCount = 0;
     _lastTopic = '';
+    // Clear persisted history too
+    if (typeof MeowStorage !== 'undefined' && _pageContext?.url) {
+      MeowStorage.clearChatHistory(_pageContext.url).catch(() => {});
+    }
   }
 
   /**
@@ -320,7 +368,9 @@ ${userMessage}`;
     getLastAssistantMessage,
     getLastUserMessage,
     getTurnCount,
+    getFullHistory,
     shouldOfferRecap,
+    loadPersistedHistory,
     updatePageContext,
     getPageContext,
     buildPayload,
