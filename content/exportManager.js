@@ -3,7 +3,7 @@
  * Export conversations as Markdown, JSON, or copy to clipboard.
  */
 
-const MeowExportManager = (() => {
+const MeowExport = (() => {
   'use strict';
 
   /**
