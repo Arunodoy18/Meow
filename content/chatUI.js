@@ -588,9 +588,352 @@ const MeowChatUI = (() => {
         0%, 100% { opacity: 0.3; transform: scale(0.8); }
         50% { opacity: 1; transform: scale(1.2); }
       }
+
+      /* ==================== RESIZE HANDLE ==================== */
+      .meow-resize-handle {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 6px;
+        height: 100%;
+        cursor: col-resize;
+        background: transparent;
+        z-index: 10;
+        transition: background 0.2s;
+      }
+      .meow-resize-handle:hover,
+      .meow-resize-handle.active {
+        background: var(--meow-primary);
+      }
+
+      /* ==================== HEADER ACTIONS ==================== */
+      .meow-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .meow-header-action-btn {
+        all: initial;
+        background: rgba(255,255,255,0.1);
+        border: none;
+        color: var(--meow-text-secondary);
+        font-size: 15px;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        transition: all 0.2s;
+        font-family: var(--meow-font);
+      }
+      .meow-header-action-btn:hover {
+        background: rgba(255,255,255,0.2);
+        color: var(--meow-primary);
+      }
+
+      /* ==================== EXPORT DROPDOWN ==================== */
+      .meow-export-menu {
+        position: absolute;
+        top: 100%;
+        right: 40px;
+        margin-top: 6px;
+        background: var(--meow-bg);
+        border: 1px solid var(--meow-glass-border);
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        min-width: 180px;
+        padding: 6px 0;
+        z-index: 2147483647;
+        animation: meowMenuSlide 0.2s ease;
+        font-family: var(--meow-font);
+      }
+      .meow-export-item {
+        all: initial;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--meow-text-primary);
+        transition: background 0.15s;
+        width: 100%;
+        font-family: var(--meow-font);
+      }
+      .meow-export-item:hover {
+        background: rgba(34,197,94,0.1);
+      }
+
+      /* ==================== FOLLOW-UP SUGGESTIONS ==================== */
+      .meow-follow-ups {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 4px 0 8px;
+        animation: meowMsgSlide 0.3s ease;
+      }
+      .meow-follow-up-btn {
+        all: initial;
+        padding: 6px 12px;
+        background: rgba(34,197,94,0.08);
+        border: 1px solid rgba(34,197,94,0.2);
+        border-radius: 16px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--meow-primary-light);
+        transition: all 0.2s;
+        font-family: var(--meow-font);
+      }
+      .meow-follow-up-btn:hover {
+        background: rgba(34,197,94,0.18);
+        border-color: var(--meow-primary);
+        transform: translateY(-1px);
+      }
+
+      /* ==================== SLASH COMMAND AUTOCOMPLETE ==================== */
+      .meow-autocomplete {
+        position: absolute;
+        bottom: 100%;
+        left: 0;
+        right: 0;
+        max-height: 200px;
+        overflow-y: auto;
+        background: var(--meow-bg);
+        border: 1px solid var(--meow-glass-border);
+        border-radius: 10px 10px 0 0;
+        box-shadow: 0 -4px 16px rgba(0,0,0,0.3);
+        z-index: 10;
+        display: none;
+        font-family: var(--meow-font);
+      }
+      .meow-autocomplete.visible { display: block; }
+      .meow-autocomplete-item {
+        display: flex;
+        flex-direction: column;
+        padding: 8px 14px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .meow-autocomplete-item:hover,
+      .meow-autocomplete-item.selected {
+        background: rgba(34,197,94,0.1);
+      }
+      .meow-autocomplete-cmd {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--meow-primary);
+      }
+      .meow-autocomplete-desc {
+        font-size: 11px;
+        color: var(--meow-text-secondary);
+      }
+
+      /* ==================== SETTINGS PANEL ==================== */
+      .meow-settings-overlay {
+        position: absolute;
+        inset: 0;
+        background: var(--meow-panel-bg);
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        animation: meowMenuSlide 0.2s ease;
+      }
+      .meow-settings-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-bottom: 1px solid rgba(34,197,94,0.15);
+        background: var(--meow-bg);
+      }
+      .meow-settings-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--meow-primary);
+      }
+      .meow-settings-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+      }
+      .meow-setting-group {
+        margin-bottom: 18px;
+      }
+      .meow-setting-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        color: var(--meow-text-primary);
+        margin-bottom: 6px;
+        font-family: var(--meow-font);
+      }
+      .meow-setting-select {
+        all: initial;
+        width: 100%;
+        padding: 8px 10px;
+        background: var(--meow-bg);
+        border: 1px solid rgba(34,197,94,0.2);
+        border-radius: 8px;
+        color: var(--meow-text-primary);
+        font-size: 13px;
+        font-family: var(--meow-font);
+        cursor: pointer;
+      }
+      .meow-setting-toggle {
+        position: relative;
+        width: 36px;
+        height: 20px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .meow-setting-toggle.on { background: var(--meow-primary); }
+      .meow-setting-toggle::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: white;
+        transition: transform 0.2s;
+      }
+      .meow-setting-toggle.on::after { transform: translateX(16px); }
+
+      /* ==================== MARKDOWN RENDERING IN AI BUBBLES ==================== */
+      .meow-message.ai .meow-message-bubble {
+        white-space: normal;
+      }
+      .meow-message.ai .meow-message-bubble p {
+        margin: 0 0 8px;
+      }
+      .meow-message.ai .meow-message-bubble p:last-child {
+        margin-bottom: 0;
+      }
+      .meow-message.ai .meow-message-bubble h1,
+      .meow-message.ai .meow-message-bubble h2,
+      .meow-message.ai .meow-message-bubble h3 {
+        color: var(--meow-primary);
+        margin: 12px 0 6px;
+        line-height: 1.3;
+      }
+      .meow-message.ai .meow-message-bubble h1 { font-size: 16px; }
+      .meow-message.ai .meow-message-bubble h2 { font-size: 14.5px; }
+      .meow-message.ai .meow-message-bubble h3 { font-size: 13.5px; }
+      .meow-message.ai .meow-message-bubble ul,
+      .meow-message.ai .meow-message-bubble ol {
+        margin: 6px 0;
+        padding-left: 20px;
+      }
+      .meow-message.ai .meow-message-bubble li {
+        margin-bottom: 3px;
+      }
+      .meow-message.ai .meow-message-bubble blockquote {
+        border-left: 3px solid var(--meow-primary);
+        padding: 4px 10px;
+        margin: 8px 0;
+        background: rgba(34,197,94,0.05);
+        border-radius: 0 6px 6px 0;
+        color: var(--meow-text-secondary);
+      }
+      .meow-message.ai .meow-message-bubble code {
+        background: rgba(0,0,0,0.3);
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+        color: var(--meow-primary-light);
+      }
+      .meow-message.ai .meow-message-bubble pre {
+        background: #0D1117;
+        border: 1px solid rgba(34,197,94,0.15);
+        border-radius: 8px;
+        padding: 12px;
+        overflow-x: auto;
+        margin: 8px 0;
+        position: relative;
+      }
+      .meow-message.ai .meow-message-bubble pre code {
+        background: transparent;
+        padding: 0;
+        font-size: 12.5px;
+        color: var(--meow-text-primary);
+      }
+      .meow-copy-code-btn {
+        all: initial;
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        padding: 3px 8px;
+        font-size: 11px;
+        font-family: var(--meow-font);
+        color: var(--meow-text-secondary);
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .meow-copy-code-btn:hover {
+        background: rgba(34,197,94,0.15);
+        color: var(--meow-primary);
+      }
+      .meow-message.ai .meow-message-bubble strong {
+        color: var(--meow-primary-light);
+        font-weight: 600;
+      }
+      .meow-message.ai .meow-message-bubble em {
+        color: var(--meow-text-secondary);
+        font-style: italic;
+      }
+      .meow-message.ai .meow-message-bubble a {
+        color: var(--meow-accent);
+        text-decoration: none;
+      }
+      .meow-message.ai .meow-message-bubble a:hover {
+        text-decoration: underline;
+      }
+      .meow-message.ai .meow-message-bubble hr {
+        border: none;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        margin: 10px 0;
+      }
+      .meow-message.ai .meow-message-bubble table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 8px 0;
+        font-size: 12.5px;
+      }
+      .meow-message.ai .meow-message-bubble th,
+      .meow-message.ai .meow-message-bubble td {
+        border: 1px solid rgba(255,255,255,0.1);
+        padding: 6px 10px;
+        text-align: left;
+      }
+      .meow-message.ai .meow-message-bubble th {
+        background: rgba(34,197,94,0.1);
+        color: var(--meow-primary-light);
+        font-weight: 600;
+      }
     `;
 
     document.head.appendChild(style);
+
+    // Inject markdown renderer styles if available
+    if (typeof MeowMarkdown !== 'undefined' && MeowMarkdown.getStyles) {
+      const mdStyle = document.createElement('style');
+      mdStyle.id = 'meow-markdown-styles';
+      mdStyle.textContent = MeowMarkdown.getStyles();
+      document.head.appendChild(mdStyle);
+    }
   }
 
   // ==================== CREATE UI ====================
@@ -618,6 +961,7 @@ const MeowChatUI = (() => {
     _panel.setAttribute('aria-label', 'Meow AI Chat');
 
     _panel.innerHTML = `
+      <div class="meow-resize-handle"></div>
       <div class="meow-chat-header">
         <div class="meow-chat-header-left">
           <div class="meow-header-avatar">🐱</div>
@@ -626,7 +970,11 @@ const MeowChatUI = (() => {
             <div class="meow-header-mode">${mode}</div>
           </div>
         </div>
-        <button class="meow-chat-close" title="Close / Disable options" aria-label="Close or disable">✕</button>
+        <div class="meow-header-actions">
+          <button class="meow-header-action-btn meow-btn-export" title="Export conversation">📥</button>
+          <button class="meow-header-action-btn meow-btn-settings" title="Settings">⚙</button>
+          <button class="meow-chat-close" title="Close / Disable options" aria-label="Close or disable">✕</button>
+        </div>
       </div>
 
       <div class="meow-offline-banner">⚠ You're offline. Messages will fail until reconnected.</div>
@@ -642,22 +990,24 @@ const MeowChatUI = (() => {
           <div class="meow-quick-actions">
             <button class="meow-quick-btn" data-action="explain">📄 Explain this page</button>
             <button class="meow-quick-btn" data-action="summarize">✨ Summarize key points</button>
+            <button class="meow-quick-btn" data-action="review">🔍 Review this code</button>
             <button class="meow-quick-btn" data-action="help">💡 What can you do?</button>
           </div>
         </div>
       </div>
 
-      <div class="meow-chat-input">
+      <div class="meow-chat-input" style="position:relative;">
+        <div class="meow-autocomplete"></div>
         <div class="meow-input-wrapper">
           <textarea
             class="meow-chat-textarea"
-            placeholder="Ask anything…"
+            placeholder="Ask anything… (type / for commands)"
             rows="1"
             aria-label="Chat message"
           ></textarea>
           <button class="meow-send-btn" title="Send" aria-label="Send message">➤</button>
         </div>
-        <div class="meow-kb-hint"><kbd>Alt</kbd>+<kbd>M</kbd> to toggle · <kbd>Enter</kbd> to send</div>
+        <div class="meow-kb-hint"><kbd>Alt</kbd>+<kbd>M</kbd> toggle · <kbd>Enter</kbd> send · <kbd>/</kbd> commands</div>
       </div>
     `;
 
@@ -723,6 +1073,27 @@ const MeowChatUI = (() => {
       });
     }
 
+    // Export button
+    const exportBtn = _panel.querySelector('.meow-btn-export');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _toggleExportMenu();
+      });
+    }
+
+    // Settings button
+    const settingsBtn = _panel.querySelector('.meow-btn-settings');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _showSettingsPanel();
+      });
+    }
+
+    // Resize handle
+    _setupResizeHandle();
+
     // Disable menu items
     _disableMenu.querySelectorAll('.meow-disable-item').forEach(item => {
       item.addEventListener('click', (e) => {
@@ -750,14 +1121,27 @@ const MeowChatUI = (() => {
         e.preventDefault();
         _handleSend();
       }
+      // Handle autocomplete navigation
+      if (e.key === 'Tab' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const ac = _panel.querySelector('.meow-autocomplete');
+        if (ac && ac.classList.contains('visible')) {
+          e.preventDefault();
+          _navigateAutocomplete(e.key === 'ArrowUp' ? -1 : 1);
+        }
+      }
+      if (e.key === 'Escape') {
+        _hideAutocomplete();
+      }
     });
 
-    // Auto-resize with debounce
+    // Auto-resize + slash command autocomplete
     textarea.addEventListener('input', () => {
       clearTimeout(_debounceTimer);
       _debounceTimer = setTimeout(() => {
         textarea.style.height = 'auto';
         textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        // Check for slash commands
+        _updateAutocomplete(textarea.value);
       }, DEBOUNCE_MS);
     });
 
@@ -767,6 +1151,7 @@ const MeowChatUI = (() => {
         const actions = {
           explain: 'Explain this page in detail',
           summarize: 'Give me the key insights from this page',
+          review: 'Review this code — highlight issues and improvements',
           help: 'What can you help me with?'
         };
         const msg = actions[btn.dataset.action];
@@ -802,12 +1187,23 @@ const MeowChatUI = (() => {
     const welcome = container.querySelector('.meow-welcome');
     if (welcome) welcome.remove();
 
+    // Remove any existing follow-ups
+    const oldFollowUps = container.querySelector('.meow-follow-ups');
+    if (oldFollowUps) oldFollowUps.remove();
+
     const el = document.createElement('div');
     el.className = `meow-message ${type}`;
 
     const bubble = document.createElement('div');
     bubble.className = 'meow-message-bubble';
-    bubble.textContent = content;
+
+    // AI messages get markdown rendering
+    if (type === 'ai' && typeof MeowMarkdown !== 'undefined') {
+      bubble.innerHTML = MeowMarkdown.render(content);
+      _attachCopyButtons(bubble);
+    } else {
+      bubble.textContent = content;
+    }
 
     const time = document.createElement('div');
     time.className = 'meow-message-time';
@@ -941,12 +1337,20 @@ const MeowChatUI = (() => {
     const entry = _streamingMessages.get(msgId);
     if (!entry) return;
 
-    const { bubble, element } = entry;
+    const { bubble, element, textNode } = entry;
 
     // Remove cursor
     const cursor = bubble.querySelector('.meow-streaming-cursor');
     if (cursor) cursor.remove();
     bubble.classList.remove('streaming');
+
+    // Render markdown for the final content
+    const rawContent = textNode.textContent || '';
+    if (!wasError && typeof MeowMarkdown !== 'undefined' && rawContent) {
+      // Replace the textNode with rendered HTML
+      bubble.innerHTML = MeowMarkdown.render(rawContent);
+      _attachCopyButtons(bubble);
+    }
 
     if (wasError) {
       bubble.style.borderColor = 'rgba(220, 38, 38, 0.3)';
@@ -959,6 +1363,11 @@ const MeowChatUI = (() => {
     element.appendChild(time);
 
     _streamingMessages.delete(msgId);
+
+    // Show follow-up suggestions for successful AI responses
+    if (!wasError && rawContent.length > 50) {
+      _showFollowUpSuggestions(rawContent);
+    }
   }
 
   /**
@@ -1031,6 +1440,394 @@ const MeowChatUI = (() => {
     _onDisableCallback = callback;
   }
 
+  // ==================== RESIZE HANDLE ====================
+
+  function _setupResizeHandle() {
+    const handle = _panel.querySelector('.meow-resize-handle');
+    if (!handle) return;
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 400;
+
+    handle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startX = e.clientX;
+      startWidth = _panel.offsetWidth;
+      handle.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const diff = startX - e.clientX;
+      const newWidth = Math.max(320, Math.min(800, startWidth + diff));
+      _panel.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!isResizing) return;
+      isResizing = false;
+      handle.classList.remove('active');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      // Save width preference
+      if (typeof MeowStorage !== 'undefined') {
+        MeowStorage.setPreference('panelWidth', _panel.offsetWidth).catch(() => {});
+      }
+    });
+
+    // Restore saved width
+    if (typeof MeowStorage !== 'undefined') {
+      MeowStorage.getPreferences().then(prefs => {
+        if (prefs.panelWidth && prefs.panelWidth !== 400) {
+          _panel.style.width = prefs.panelWidth + 'px';
+        }
+      }).catch(() => {});
+    }
+  }
+
+  // ==================== EXPORT MENU ====================
+
+  function _toggleExportMenu() {
+    const existing = _panel.querySelector('.meow-export-menu');
+    if (existing) { existing.remove(); return; }
+
+    const header = _panel.querySelector('.meow-chat-header');
+    const menu = document.createElement('div');
+    menu.className = 'meow-export-menu';
+    menu.innerHTML = `
+      <div class="meow-export-item" data-format="markdown">📝 Export as Markdown</div>
+      <div class="meow-export-item" data-format="json">📋 Export as JSON</div>
+      <div class="meow-export-item" data-format="clipboard">📎 Copy to Clipboard</div>
+    `;
+
+    menu.querySelectorAll('.meow-export-item').forEach(item => {
+      item.addEventListener('click', () => {
+        menu.remove();
+        _doExport(item.dataset.format);
+      });
+    });
+
+    header.appendChild(menu);
+
+    // Auto-close on click outside
+    setTimeout(() => {
+      const close = (e) => {
+        if (!menu.contains(e.target)) {
+          menu.remove();
+          document.removeEventListener('click', close, true);
+        }
+      };
+      document.addEventListener('click', close, true);
+    }, 10);
+  }
+
+  function _doExport(format) {
+    if (typeof MeowExport === 'undefined' || typeof MeowConversationMemory === 'undefined') return;
+    const history = MeowConversationMemory.getFullHistory();
+    const pageTitle = document.title || 'Meow AI Chat';
+    const mode = _panel.querySelector('.meow-header-mode')?.textContent || 'General';
+
+    if (format === 'markdown') {
+      MeowExport.downloadMarkdown(history, pageTitle, mode);
+    } else if (format === 'json') {
+      MeowExport.downloadJSON(history, pageTitle, mode);
+    } else if (format === 'clipboard') {
+      MeowExport.copyToClipboard(history, pageTitle, mode).then(ok => {
+        if (ok) _showToast('Copied to clipboard!');
+        else _showToast('Failed to copy');
+      });
+    }
+  }
+
+  // ==================== SETTINGS PANEL ====================
+
+  async function _showSettingsPanel() {
+    // Remove existing
+    const existing = _panel.querySelector('.meow-settings-overlay');
+    if (existing) { existing.remove(); return; }
+
+    let prefs = {};
+    if (typeof MeowStorage !== 'undefined') {
+      prefs = await MeowStorage.getPreferences();
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'meow-settings-overlay';
+    overlay.innerHTML = `
+      <div class="meow-settings-header">
+        <span class="meow-settings-title">⚙ Settings</span>
+        <button class="meow-header-action-btn meow-settings-close-btn">✕</button>
+      </div>
+      <div class="meow-settings-body">
+        <div class="meow-setting-group">
+          <div class="meow-setting-label">
+            Verbosity
+            <select class="meow-setting-select" data-pref="verbosity">
+              <option value="concise" ${prefs.verbosity === 'concise' ? 'selected' : ''}>Concise</option>
+              <option value="balanced" ${prefs.verbosity === 'balanced' ? 'selected' : ''}>Balanced</option>
+              <option value="detailed" ${prefs.verbosity === 'detailed' ? 'selected' : ''}>Detailed</option>
+            </select>
+          </div>
+        </div>
+        <div class="meow-setting-group">
+          <div class="meow-setting-label">
+            Skill Level
+            <select class="meow-setting-select" data-pref="skillLevel">
+              <option value="beginner" ${prefs.skillLevel === 'beginner' ? 'selected' : ''}>Beginner</option>
+              <option value="intermediate" ${prefs.skillLevel === 'intermediate' ? 'selected' : ''}>Intermediate</option>
+              <option value="advanced" ${prefs.skillLevel === 'advanced' ? 'selected' : ''}>Advanced</option>
+            </select>
+          </div>
+        </div>
+        <div class="meow-setting-group">
+          <div class="meow-setting-label">
+            Font Size
+            <select class="meow-setting-select" data-pref="fontSize">
+              <option value="small" ${prefs.fontSize === 'small' ? 'selected' : ''}>Small</option>
+              <option value="medium" ${prefs.fontSize === 'medium' ? 'selected' : ''}>Medium</option>
+              <option value="large" ${prefs.fontSize === 'large' ? 'selected' : ''}>Large</option>
+            </select>
+          </div>
+        </div>
+        <div class="meow-setting-group">
+          <div class="meow-setting-label">
+            Code Theme
+            <select class="meow-setting-select" data-pref="codeTheme">
+              <option value="dark" ${prefs.codeTheme === 'dark' ? 'selected' : ''}>Dark</option>
+              <option value="monokai" ${prefs.codeTheme === 'monokai' ? 'selected' : ''}>Monokai</option>
+              <option value="github" ${prefs.codeTheme === 'github' ? 'selected' : ''}>GitHub</option>
+            </select>
+          </div>
+        </div>
+        <div class="meow-setting-group">
+          <div class="meow-setting-label">
+            Markdown Rendering
+            <div class="meow-setting-toggle ${prefs.markdownRendering !== false ? 'on' : ''}" data-pref="markdownRendering"></div>
+          </div>
+        </div>
+        <div class="meow-setting-group">
+          <div class="meow-setting-label">
+            Show Follow-ups
+            <div class="meow-setting-toggle ${prefs.showFollowUps !== false ? 'on' : ''}" data-pref="showFollowUps"></div>
+          </div>
+        </div>
+        <div class="meow-setting-group">
+          <div class="meow-setting-label">
+            Panel Side
+            <select class="meow-setting-select" data-pref="panelSide">
+              <option value="right" ${prefs.panelSide === 'right' ? 'selected' : ''}>Right</option>
+              <option value="left" ${prefs.panelSide === 'left' ? 'selected' : ''}>Left</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Close button
+    overlay.querySelector('.meow-settings-close-btn').addEventListener('click', () => overlay.remove());
+
+    // Handle select changes
+    overlay.querySelectorAll('.meow-setting-select').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const key = sel.dataset.pref;
+        if (typeof MeowStorage !== 'undefined') {
+          MeowStorage.setPreference(key, sel.value).catch(() => {});
+        }
+        _applyPreference(key, sel.value);
+      });
+    });
+
+    // Handle toggle changes
+    overlay.querySelectorAll('.meow-setting-toggle').forEach(tog => {
+      tog.addEventListener('click', () => {
+        const isOn = tog.classList.toggle('on');
+        const key = tog.dataset.pref;
+        if (typeof MeowStorage !== 'undefined') {
+          MeowStorage.setPreference(key, isOn).catch(() => {});
+        }
+      });
+    });
+
+    _panel.appendChild(overlay);
+  }
+
+  function _applyPreference(key, value) {
+    if (key === 'fontSize') {
+      const sizes = { small: '12.5px', medium: '13.5px', large: '15px' };
+      const msgs = _panel.querySelector('.meow-chat-messages');
+      if (msgs) msgs.style.fontSize = sizes[value] || '13.5px';
+    }
+    if (key === 'panelSide') {
+      if (value === 'left') {
+        _panel.style.right = 'auto';
+        _panel.style.left = '0';
+        _panel.style.borderLeft = 'none';
+        _panel.style.borderRight = '1px solid var(--meow-glass-border)';
+      } else {
+        _panel.style.left = 'auto';
+        _panel.style.borderRight = 'none';
+        _panel.style.borderLeft = '1px solid var(--meow-glass-border)';
+      }
+    }
+  }
+
+  // ==================== FOLLOW-UP SUGGESTIONS ====================
+
+  function _showFollowUpSuggestions(aiResponse) {
+    const container = _panel?.querySelector('.meow-chat-messages');
+    if (!container) return;
+
+    // Remove existing follow-ups
+    const old = container.querySelector('.meow-follow-ups');
+    if (old) old.remove();
+
+    const suggestions = _generateFollowUps(aiResponse);
+    if (!suggestions.length) return;
+
+    const div = document.createElement('div');
+    div.className = 'meow-follow-ups';
+
+    suggestions.forEach(text => {
+      const btn = document.createElement('button');
+      btn.className = 'meow-follow-up-btn';
+      btn.textContent = text;
+      btn.addEventListener('click', () => {
+        div.remove();
+        const textarea = _panel.querySelector('.meow-chat-textarea');
+        if (textarea) {
+          textarea.value = text;
+          _handleSend();
+        }
+      });
+      div.appendChild(btn);
+    });
+
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function _generateFollowUps(response) {
+    const lower = response.toLowerCase();
+    const followUps = [];
+
+    if (lower.includes('function') || lower.includes('class') || lower.includes('code')) {
+      followUps.push('Show me an example');
+    }
+    if (lower.includes('error') || lower.includes('bug') || lower.includes('issue')) {
+      followUps.push('How do I fix this?');
+    }
+    if (lower.includes('performance') || lower.includes('optimize')) {
+      followUps.push('What are the benchmarks?');
+    }
+    if (lower.includes('security') || lower.includes('vulnerability')) {
+      followUps.push('Show me the secure version');
+    }
+    if (lower.length > 500) {
+      followUps.push('Summarize in 3 bullets');
+    }
+
+    // Always offer these
+    followUps.push('Go deeper');
+    followUps.push('Explain like I\'m 5');
+
+    return followUps.slice(0, 4);
+  }
+
+  // ==================== SLASH COMMAND AUTOCOMPLETE ====================
+
+  function _updateAutocomplete(value) {
+    const ac = _panel?.querySelector('.meow-autocomplete');
+    if (!ac) return;
+
+    if (!value.startsWith('/') || value.includes(' ') || typeof MeowSlashCommands === 'undefined') {
+      _hideAutocomplete();
+      return;
+    }
+
+    const suggestions = MeowSlashCommands.getSuggestions(value);
+    if (!suggestions.length) { _hideAutocomplete(); return; }
+
+    ac.innerHTML = '';
+    suggestions.forEach((s, i) => {
+      const item = document.createElement('div');
+      item.className = 'meow-autocomplete-item' + (i === 0 ? ' selected' : '');
+      item.innerHTML = `
+        <span class="meow-autocomplete-cmd">${s.command}</span>
+        <span class="meow-autocomplete-desc">${s.description}</span>
+      `;
+      item.addEventListener('click', () => {
+        const textarea = _panel.querySelector('.meow-chat-textarea');
+        textarea.value = s.command + ' ';
+        textarea.focus();
+        _hideAutocomplete();
+      });
+      ac.appendChild(item);
+    });
+
+    ac.classList.add('visible');
+  }
+
+  function _hideAutocomplete() {
+    const ac = _panel?.querySelector('.meow-autocomplete');
+    if (ac) ac.classList.remove('visible');
+  }
+
+  function _navigateAutocomplete(dir) {
+    const ac = _panel?.querySelector('.meow-autocomplete');
+    if (!ac) return;
+    const items = ac.querySelectorAll('.meow-autocomplete-item');
+    let idx = Array.from(items).findIndex(i => i.classList.contains('selected'));
+    items[idx]?.classList.remove('selected');
+    idx = (idx + dir + items.length) % items.length;
+    items[idx]?.classList.add('selected');
+
+    // If Tab was used, select the item
+    const textarea = _panel.querySelector('.meow-chat-textarea');
+    const cmd = items[idx]?.querySelector('.meow-autocomplete-cmd')?.textContent;
+    if (cmd) textarea.value = cmd + ' ';
+  }
+
+  // ==================== CODE COPY BUTTONS ====================
+
+  function _attachCopyButtons(bubble) {
+    bubble.querySelectorAll('pre').forEach(pre => {
+      const btn = document.createElement('button');
+      btn.className = 'meow-copy-code-btn';
+      btn.textContent = 'Copy';
+      btn.addEventListener('click', () => {
+        const code = pre.querySelector('code')?.textContent || pre.textContent;
+        navigator.clipboard.writeText(code).then(() => {
+          btn.textContent = '✓ Copied';
+          setTimeout(() => btn.textContent = 'Copy', 2000);
+        }).catch(() => {
+          btn.textContent = '✗ Failed';
+          setTimeout(() => btn.textContent = 'Copy', 2000);
+        });
+      });
+      pre.style.position = 'relative';
+      pre.appendChild(btn);
+    });
+  }
+
+  // ==================== TOAST NOTIFICATION ====================
+
+  function _showToast(text) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      padding: 8px 18px; background: var(--meow-primary); color: #0B0F14;
+      border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 2147483647;
+      animation: meowMsgSlide 0.2s ease; font-family: var(--meow-font);
+    `;
+    toast.textContent = text;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  }
+
   // ==================== CLEANUP ====================
 
   function destroy() {
@@ -1057,6 +1854,7 @@ const MeowChatUI = (() => {
     showRetryButton,
     showThinking,
     hideThinking,
+    showFollowUps: _showFollowUpSuggestions,
     openPanel,
     closePanel,
     togglePanel,

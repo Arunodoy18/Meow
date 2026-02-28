@@ -1,11 +1,13 @@
 /**
- * Meow AI - Widget Orchestrator (v3.0 Conversational AI)
- * Main entry point: wires all 4 engines together.
+ * Meow AI - Widget Orchestrator (v4.0 Advanced)
+ * Main entry point: wires all engines + new advanced modules.
  *
- * Engine 1: MeowStreamManager    — Streaming reliability
- * Engine 2: MeowConversationMemory — Conversation context
- * Engine 3: MeowHumanEngine      — Human interaction
- * Engine 4: MeowPersonality      — Tone & personality
+ * Core Engines:
+ *   MeowStreamManager, MeowConversationMemory, MeowHumanEngine, MeowPersonality
+ *
+ * Advanced Modules:
+ *   MeowSlashCommands, MeowExport, MeowPromptTemplates,
+ *   MeowOfflineCache, MeowSiteExtractors, MeowMarkdown
  *
  * + MeowChatUI, MeowScrollManager, MeowDrag, MeowPageExtractor, MeowStorage
  */
@@ -43,7 +45,7 @@
       MeowScrollManager.scrollOnChunk();
     });
 
-    // On finalize → finish message, save to memory, re-enable input
+    // On finalize → finish message, save to memory, cache, re-enable input
     MeowStreamManager.onFinalize((msgId, fullContent, wasError) => {
       MeowChatUI.hideTyping();
       MeowChatUI.hideThinking();
@@ -59,6 +61,11 @@
       // Save to conversation memory
       if (fullContent && !wasError) {
         MeowConversationMemory.addMessage('assistant', fullContent);
+
+        // Cache the response for offline use
+        if (typeof MeowOfflineCache !== 'undefined' && _lastUserMessage) {
+          MeowOfflineCache.store(window.location.href, _lastUserMessage, fullContent, _lastMode);
+        }
       }
 
       // Show retry on error
@@ -91,9 +98,61 @@
   async function handleSendMessage(userMessage) {
     if (MeowStreamManager.isStreaming() || !userMessage) return;
 
+    // ── Slash command handling ──
+    if (typeof MeowSlashCommands !== 'undefined' && MeowSlashCommands.isCommand(userMessage)) {
+      const parsed = MeowSlashCommands.parse(userMessage);
+
+      // Special commands handled locally
+      if (parsed.isSpecial) {
+        if (parsed.command === '/help') {
+          MeowChatUI.addMessage('ai', MeowSlashCommands.getHelpText());
+          return;
+        }
+        if (parsed.command === '/clear') {
+          MeowConversationMemory.clear();
+          // Reload the panel by closing & opening
+          MeowChatUI.closePanel();
+          MeowChatUI.openPanel();
+          return;
+        }
+        if (parsed.command === '/export') {
+          if (typeof MeowExport !== 'undefined') {
+            const history = MeowConversationMemory.getFullHistory();
+            const ok = await MeowExport.copyToClipboard(history, document.title, _lastMode);
+            MeowChatUI.addMessage('ai', ok ? '✅ Conversation copied to clipboard!' : '❌ Failed to copy.');
+          }
+          return;
+        }
+        if (parsed.command === '/stats') {
+          _showUsageStats();
+          return;
+        }
+        if (parsed.command === '/template') {
+          _showTemplateList();
+          return;
+        }
+      }
+
+      // Rewrite message for AI commands (e.g., /review → "Review this code: ...")
+      userMessage = parsed.message;
+    }
+
     // Store for retry
     _lastUserMessage = userMessage;
     _lastMode = MeowPageExtractor.detectPageMode(window.location.href);
+
+    // ── Check offline cache ──
+    if (typeof MeowOfflineCache !== 'undefined') {
+      const cached = MeowOfflineCache.retrieve(window.location.href, userMessage);
+      if (cached) {
+        MeowChatUI.addMessage('user', userMessage);
+        MeowConversationMemory.addMessage('user', userMessage);
+        MeowChatUI.addMessage('ai', '📦 *Cached response:*\n\n' + cached);
+        MeowConversationMemory.addMessage('assistant', cached);
+        MeowScrollManager.scrollToBottom();
+        return;
+      }
+    }
 
     // Step 1: Show user message in UI
     MeowChatUI.addMessage('user', userMessage);
@@ -123,13 +182,33 @@
     const depthHint = MeowHumanEngine.getDepthHint();
     const payload = MeowConversationMemory.buildPayload(userMessage, _lastMode);
 
-    // Augment system prompt with conversation hints
+    // Augment system prompt with conversation hints + user preferences
     if (conversationHint || depthHint) {
       payload.systemPrompt += (conversationHint || '') + (depthHint ? '\n' + depthHint : '');
     }
 
+    // Add user skill-level preference to system prompt
+    if (typeof MeowStorage !== 'undefined') {
+      try {
+        const prefs = await MeowStorage.getPreferences();
+        if (prefs.verbosity === 'concise') {
+          payload.systemPrompt += '\nBe concise — bullet points preferred.';
+        } else if (prefs.verbosity === 'detailed') {
+          payload.systemPrompt += '\nBe very detailed with examples and explanations.';
+        }
+        if (prefs.skillLevel === 'beginner') {
+          payload.systemPrompt += '\nExplain concepts simply for a beginner developer.';
+        } else if (prefs.skillLevel === 'advanced') {
+          payload.systemPrompt += '\nAssume an advanced developer audience. Skip basics.';
+        }
+      } catch (e) { /* prefs not critical */ }
+    }
+
     // Step 8: Start streaming — callbacks handle the rest
     await MeowStreamManager.startStream(payload, _lastMode);
+
+    // ── Track usage via background ──
+    _trackUsage(_lastMode);
   }
 
   // ==================== RETRY ====================
@@ -169,6 +248,24 @@
       if (e.altKey && (e.key === 'm' || e.key === 'M')) {
         e.preventDefault();
         MeowChatUI.togglePanel();
+      }
+
+      // ALT + E → explain page
+      if (e.altKey && (e.key === 'e' || e.key === 'E') && MeowChatUI.isPanelOpen()) {
+        e.preventDefault();
+        handleSendMessage('Explain this page in detail');
+      }
+
+      // ALT + S → summarize
+      if (e.altKey && (e.key === 's' || e.key === 'S') && MeowChatUI.isPanelOpen()) {
+        e.preventDefault();
+        handleSendMessage('Summarize the key points from this page');
+      }
+
+      // ALT + R → review code
+      if (e.altKey && (e.key === 'r' || e.key === 'R') && MeowChatUI.isPanelOpen()) {
+        e.preventDefault();
+        handleSendMessage('Review this code — highlight issues and improvements');
       }
 
       // Escape → close panel (abort stream if active)
@@ -211,6 +308,11 @@
         if (request.action === 'getPageContent') {
           const content = MeowPageExtractor.extractPageContent();
           sendResponse({ success: true, data: content });
+        } else if (request.action === 'contextMenuAction') {
+          // Context menu actions from background.js
+          MeowChatUI.openPanel();
+          handleSendMessage(request.message);
+          sendResponse({ success: true });
         } else {
           sendResponse({ success: false, error: 'Unknown action' });
         }
@@ -230,6 +332,58 @@
         console.log('🐱 Tab hidden — stream continues in background');
       }
     });
+  }
+
+  // ==================== USAGE TRACKING ====================
+
+  function _trackUsage(mode) {
+    try {
+      chrome.runtime.sendMessage({ action: 'trackUsage', mode });
+    } catch (e) {
+      // Background not available — non-critical
+    }
+  }
+
+  function _showUsageStats() {
+    try {
+      chrome.runtime.sendMessage({ action: 'getStats' }, (response) => {
+        if (response && response.stats) {
+          const s = response.stats;
+          const text = `📊 **Your Meow AI Stats**\n\n` +
+            `**Total queries:** ${s.totalQueries}\n` +
+            `**Current streak:** ${s.streak} day(s)\n` +
+            `**Today:** ${s.todayQueries} queries\n` +
+            `**Favorite mode:** ${s.topMode || 'N/A'}\n\n` +
+            `_Keep going! 🐱_`;
+          MeowChatUI.addMessage('ai', text);
+        } else {
+          MeowChatUI.addMessage('ai', '📊 No usage data yet. Start chatting!');
+        }
+      });
+    } catch (e) {
+      MeowChatUI.addMessage('ai', '📊 Stats tracking is not available.');
+    }
+  }
+
+  // ==================== TEMPLATE LIST ====================
+
+  function _showTemplateList() {
+    if (typeof MeowPromptTemplates === 'undefined') {
+      MeowChatUI.addMessage('ai', 'Templates module not loaded.');
+      return;
+    }
+    const templates = MeowPromptTemplates.getAll();
+    const categories = MeowPromptTemplates.getCategories();
+    let text = '📋 **Prompt Templates**\n\n';
+    categories.forEach(cat => {
+      text += `**${cat}:**\n`;
+      templates.filter(t => t.category === cat).forEach(t => {
+        text += `• \`${t.name}\` — ${t.description}\n`;
+      });
+      text += '\n';
+    });
+    text += '_Click a template name or type `/template <name>` to use it._';
+    MeowChatUI.addMessage('ai', text);
   }
 
   // ==================== INITIALIZATION ====================
@@ -265,6 +419,18 @@
       const pageData = MeowPageExtractor.extractPageContent();
       MeowConversationMemory.updatePageContext(pageData);
 
+      // Attempt to load persisted conversation history
+      const url = window.location.href;
+      const restored = await MeowConversationMemory.loadPersistedHistory(url);
+      if (restored) {
+        // Replay recent messages into the UI
+        const recent = MeowConversationMemory.getRecentMessages(6);
+        recent.forEach(msg => {
+          MeowChatUI.addMessage(msg.role === 'user' ? 'user' : 'ai', msg.content);
+        });
+        console.log('🐱 Restored', recent.length, 'messages from previous session');
+      }
+
       // Wire streaming callbacks
       _setupStreamCallbacks();
 
@@ -285,9 +451,25 @@
       setupMessageListener();
       setupVisibilityHandler();
 
+      // Apply saved preferences
+      if (typeof MeowStorage !== 'undefined') {
+        try {
+          const prefs = await MeowStorage.getPreferences();
+          if (prefs.panelSide === 'left') {
+            panel.style.right = 'auto';
+            panel.style.left = '-420px';
+          }
+        } catch (e) { /* non-critical */ }
+      }
+
+      // Notify background of mode for badge
+      try {
+        chrome.runtime.sendMessage({ action: 'updateBadge', mode });
+      } catch (e) { /* background might not be ready */ }
+
       const mode = MeowPageExtractor.detectPageMode(window.location.href);
       _lastMode = mode;
-      console.log('🐱 Meow AI v3.0 initialized | Mode:', mode, '| Engines: Stream, Memory, Human, Personality');
+      console.log('🐱 Meow AI v4.0 initialized | Mode:', mode, '| Advanced modules loaded');
 
     } catch (error) {
       console.error('🐱 Meow AI init failed:', error);
