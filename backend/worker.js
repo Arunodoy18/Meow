@@ -29,13 +29,68 @@ const CONFIG = {
   RETRY_DELAY_MS: 1000,
   
   // CORS allowed origins (Chrome extension protocol)
-  // "*" allows all origins - restrict in production if needed
   ALLOWED_ORIGINS: ['*'],
   
-  // Rate limiting (optional - implement if needed)
+  // Rate limiting
   MAX_MESSAGE_LENGTH: 8000,
   MAX_PROMPT_LENGTH: 15000,
+
+  // In-memory rate limiting (per-worker instance)
+  RATE_LIMIT_WINDOW_MS: 60000,     // 1 minute window
+  RATE_LIMIT_MAX_REQUESTS: 20,     // 20 requests per minute per IP
+  RATE_LIMIT_BURST: 5,             // Allow 5 rapid fire
 };
+
+// ==================== IN-MEMORY RATE LIMITER ====================
+
+/**
+ * Simple in-memory sliding window rate limiter.
+ * NOTE: This is per-worker instance. For distributed rate limiting,
+ * use Cloudflare KV or Durable Objects.
+ */
+const _rateLimitMap = new Map();
+
+function _cleanupRateLimiter() {
+  const now = Date.now();
+  for (const [key, entries] of _rateLimitMap) {
+    const valid = entries.filter(t => now - t < CONFIG.RATE_LIMIT_WINDOW_MS);
+    if (valid.length === 0) _rateLimitMap.delete(key);
+    else _rateLimitMap.set(key, valid);
+  }
+}
+
+/**
+ * Check and record a request for rate limiting.
+ * @param {string} identifier - IP or user token
+ * @returns {{ allowed: boolean, remaining: number, resetMs: number }}
+ */
+function checkRateLimit(identifier) {
+  const now = Date.now();
+  const entries = (_rateLimitMap.get(identifier) || []).filter(
+    t => now - t < CONFIG.RATE_LIMIT_WINDOW_MS
+  );
+
+  if (entries.length >= CONFIG.RATE_LIMIT_MAX_REQUESTS) {
+    const oldest = entries[0];
+    return {
+      allowed: false,
+      remaining: 0,
+      resetMs: CONFIG.RATE_LIMIT_WINDOW_MS - (now - oldest),
+    };
+  }
+
+  entries.push(now);
+  _rateLimitMap.set(identifier, entries);
+
+  // Periodic cleanup
+  if (Math.random() < 0.05) _cleanupRateLimiter();
+
+  return {
+    allowed: true,
+    remaining: CONFIG.RATE_LIMIT_MAX_REQUESTS - entries.length,
+    resetMs: CONFIG.RATE_LIMIT_WINDOW_MS,
+  };
+}
 
 // ==================== CORS HEADERS ====================
 
@@ -51,7 +106,8 @@ function getCorsHeaders(origin = '*') {
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Meow-Token',
+    'Access-Control-Expose-Headers': 'X-RateLimit-Remaining, X-RateLimit-Reset',
     'Access-Control-Max-Age': '86400', // 24 hours
   };
 }
@@ -537,6 +593,35 @@ export default {
     if (!env.GEMINI_API_KEY) {
       console.error('CRITICAL: GEMINI_API_KEY environment variable not set');
       return buildErrorResponse('SERVICE_UNAVAILABLE');
+    }
+    
+    // ==================== RATE LIMITING ====================
+
+    // Identify requester by token or IP
+    const userToken = request.headers.get('X-Meow-Token') || '';
+    const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const rateLimitKey = userToken || clientIP;
+
+    const rateCheck = checkRateLimit(rateLimitKey);
+    if (!rateCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Rate limit exceeded. Please wait before sending more requests.',
+          code: 'RATE_LIMIT',
+          retryAfterMs: rateCheck.resetMs,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil(rateCheck.resetMs / 1000)),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.ceil(rateCheck.resetMs / 1000)),
+            ...getCorsHeaders(),
+          },
+        }
+      );
     }
     
     // ==================== REQUEST PARSING ====================
