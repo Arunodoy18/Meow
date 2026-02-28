@@ -1,5 +1,5 @@
 ﻿/**
- * Meow AI - Popup Script v3.0
+ * Meow AI - Popup Script v4.0
  * Handles popup UI, page analysis, and backend API calls.
  * Backend: Cloudflare Workers -> Gemini 2.5 Flash
  */
